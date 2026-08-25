@@ -1,0 +1,569 @@
+<!--
+    Everything that is pressed or switched.
+
+    Two families of button, deliberately: one filled in the accent, of which there is at
+    most one on any screen, and one outlined, of which there may be several. A screen with
+    two filled buttons has told the player nothing about which one to press.
+
+    Both the framework's Button and the library's are given templates. An implicit style is
+    keyed on the exact type, so a style for Button does not reach a ui:Button — which is
+    what the markup uses wherever there is an icon, and would otherwise be the one control
+    still wearing the stock theme.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                    xmlns:local="clr-namespace:Login38.Ui">
+
+    <!--
+        What this file needs, named rather than assumed.
+
+        A StaticResource inside a merged dictionary does not reliably reach a *sibling*
+        merged dictionary: it resolves against its own dictionary and what that dictionary
+        merges. So each file merges what it uses. The addresses are the same ones the theme
+        merges, and WPF hands back the same dictionary for an address it has already
+        loaded — so this costs a lookup, not a second copy.
+    -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="pack://application:,,,/Login38.Ui;component/Theme/Palette.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Login38.Ui;component/Theme/Typography.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Login38.Ui;component/Theme/Primitives.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+
+    <!-- ================================================================== Plain button -->
+
+    <ControlTemplate x:Key="Button.Outlined.Template" TargetType="ButtonBase">
+        <Border x:Name="Shell"
+                Background="{StaticResource Surface.Raised}"
+                BorderBrush="{StaticResource Line.Strong}"
+                BorderThickness="1"
+                SnapsToDevicePixels="True">
+            <ContentPresenter x:Name="Body"
+                              Margin="{TemplateBinding Padding}"
+                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="Center"
+                              RecognizesAccessKey="True" />
+        </Border>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter TargetName="Shell" Property="Background" Value="{StaticResource Surface.Hover}" />
+                <Setter TargetName="Shell" Property="BorderBrush" Value="{StaticResource Accent.Deep}" />
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="Shell" Property="Background" Value="{StaticResource Surface.Press}" />
+                <Setter TargetName="Shell" Property="BorderBrush" Value="{StaticResource Accent}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Shell" Property="Background" Value="{StaticResource Surface.Sunken}" />
+                <Setter TargetName="Shell" Property="BorderBrush" Value="{StaticResource Line.Subtle}" />
+                <Setter Property="Foreground" Value="{StaticResource Ink.Disabled}" />
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
+    <Style x:Key="Button.Base" TargetType="ButtonBase" BasedOn="{StaticResource Focus.Ring}">
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Body}" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Primary}" />
+        <Setter Property="MinHeight" Value="{StaticResource Control.Height}" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template" Value="{StaticResource Button.Outlined.Template}" />
+    </Style>
+
+    <Style TargetType="Button" BasedOn="{StaticResource Button.Base}" />
+
+    <Style TargetType="RepeatButton" BasedOn="{StaticResource Button.Base}" />
+
+    <!--
+        The one filled button on a screen.
+
+        The chamfer and the width of the letter spacing are what carry the weight here
+        rather than size: a very large button in a small window reads as a mistake, and the
+        cut corner marks it as the thing to press at any size.
+    -->
+    <Style x:Key="Button.Primary" TargetType="ButtonBase" BasedOn="{StaticResource Button.Base}">
+        <Setter Property="MinHeight" Value="{StaticResource Control.Height.Large}" />
+        <Setter Property="Foreground" Value="{StaticResource Accent.Ink}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Subtitle}" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ButtonBase">
+                    <Grid>
+                        <Border x:Name="Shell"
+                                Background="{StaticResource Accent.Fill}"
+                                local:Chamfer.Size="{StaticResource Chamfer.Large}"
+                                local:Chamfer.Corners="Diagonal" />
+
+                        <!-- The outline is a sibling path rather than the border's own
+                             stroke: a clipped border draws nothing along the cut. -->
+                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          RecognizesAccessKey="True" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Accent.Fill.Hover}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Accent.Deep}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Surface.Raised}" />
+                            <Setter Property="Foreground" Value="{StaticResource Ink.Disabled}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- No fill and no edge until the pointer is on it. For anything that belongs beside
+         a control rather than under it — browse, refresh, clear. -->
+    <Style x:Key="Button.Ghost" TargetType="ButtonBase" BasedOn="{StaticResource Button.Base}">
+        <Setter Property="Foreground" Value="{StaticResource Ink.Secondary}" />
+        <Setter Property="Padding" Value="10,0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ButtonBase">
+                    <Border x:Name="Shell"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            BorderThickness="1">
+                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="Center"
+                                          RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Surface.Hover}" />
+                            <Setter Property="Foreground" Value="{StaticResource Ink.Primary}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Surface.Press}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource Ink.Disabled}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Outlined in the warning colour. For anything that throws something away: clearing
+         a slot, deleting a row. -->
+    <Style x:Key="Button.Danger" TargetType="ButtonBase" BasedOn="{StaticResource Button.Base}">
+        <Setter Property="Foreground" Value="{StaticResource Signal.Bad}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ButtonBase">
+                    <Border x:Name="Shell"
+                            Background="Transparent"
+                            BorderBrush="{StaticResource Signal.Bad}"
+                            BorderThickness="1">
+                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Signal.Bad.Wash}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Shell" Property="BorderBrush" Value="{StaticResource Line.Subtle}" />
+                            <Setter Property="Foreground" Value="{StaticResource Ink.Disabled}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ============================================================== Library buttons -->
+
+    <!--
+        The same three looks again for ui:Button, which the markup uses wherever a button
+        carries an icon. Its Appearance property chooses between them, so the existing
+        Appearance="Primary" and Appearance="Secondary" in the windows keep working and
+        mean what they say.
+    -->
+    <Style TargetType="ui:Button" BasedOn="{StaticResource Focus.Ring}">
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Body}" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Primary}" />
+        <Setter Property="MinHeight" Value="{StaticResource Control.Height}" />
+        <Setter Property="Padding" Value="16,0" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ui:Button">
+                    <Grid>
+                        <Border x:Name="Shell"
+                                Background="{StaticResource Surface.Raised}"
+                                BorderBrush="{StaticResource Line.Strong}"
+                                BorderThickness="1"
+                                SnapsToDevicePixels="True" />
+
+                        <StackPanel Orientation="Horizontal"
+                                    Margin="{TemplateBinding Padding}"
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="Center">
+                            <ContentPresenter x:Name="Symbol"
+                                              Content="{TemplateBinding Icon}"
+                                              Margin="0,0,8,0"
+                                              VerticalAlignment="Center" />
+                            <ContentPresenter VerticalAlignment="Center" RecognizesAccessKey="True" />
+                        </StackPanel>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <!-- An icon-less button would otherwise reserve the icon's margin
+                             and sit off centre. -->
+                        <Trigger Property="Icon" Value="{x:Null}">
+                            <Setter TargetName="Symbol" Property="Visibility" Value="Collapsed" />
+                        </Trigger>
+
+                        <Trigger Property="Appearance" Value="Primary">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Accent.Fill}" />
+                            <Setter TargetName="Shell" Property="BorderBrush" Value="{StaticResource Accent.Bright}" />
+                            <Setter TargetName="Shell" Property="local:Chamfer.Size" Value="{StaticResource Chamfer.Large}" />
+                            <Setter TargetName="Shell" Property="local:Chamfer.Corners" Value="Diagonal" />
+                            <Setter Property="Foreground" Value="{StaticResource Accent.Ink}" />
+                            <Setter Property="FontWeight" Value="Bold" />
+                            <Setter Property="MinHeight" Value="{StaticResource Control.Height.Large}" />
+                        </Trigger>
+
+                        <Trigger Property="Appearance" Value="Transparent">
+                            <Setter TargetName="Shell" Property="Background" Value="Transparent" />
+                            <Setter TargetName="Shell" Property="BorderBrush" Value="Transparent" />
+                            <Setter Property="Foreground" Value="{StaticResource Ink.Secondary}" />
+                        </Trigger>
+
+                        <Trigger Property="Appearance" Value="Danger">
+                            <Setter TargetName="Shell" Property="Background" Value="Transparent" />
+                            <Setter TargetName="Shell" Property="BorderBrush" Value="{StaticResource Signal.Bad}" />
+                            <Setter Property="Foreground" Value="{StaticResource Signal.Bad}" />
+                        </Trigger>
+
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Surface.Hover}" />
+                            <Setter TargetName="Shell" Property="BorderBrush" Value="{StaticResource Accent.Deep}" />
+                        </Trigger>
+
+                        <MultiTrigger>
+                            <MultiTrigger.Conditions>
+                                <Condition Property="Appearance" Value="Primary" />
+                                <Condition Property="IsMouseOver" Value="True" />
+                            </MultiTrigger.Conditions>
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Accent.Fill.Hover}" />
+                        </MultiTrigger>
+
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Surface.Press}" />
+                        </Trigger>
+
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Surface.Sunken}" />
+                            <Setter TargetName="Shell" Property="BorderBrush" Value="{StaticResource Line.Subtle}" />
+                            <Setter Property="Foreground" Value="{StaticResource Ink.Disabled}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- =================================================================== Hyperlinks -->
+
+    <Style TargetType="ui:HyperlinkButton" BasedOn="{StaticResource Focus.Ring}">
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Label}" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Secondary}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ui:HyperlinkButton">
+                    <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <ContentPresenter x:Name="Body" VerticalAlignment="Center" />
+
+                            <!-- The underline is drawn rather than set on the text, so it
+                                 can appear on hover without reflowing the label. -->
+                            <Border x:Name="Rule"
+                                    Height="1"
+                                    Margin="0"
+                                    VerticalAlignment="Bottom"
+                                    Background="Transparent" />
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource Ink.Disabled}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ===================================================================== Tick box -->
+
+    <!--
+        The most-used control in the helper by a wide margin: forty-five of them across
+        seven pages, each turning one feature on.
+
+        Square, and filled with the accent when on. A tick alone is not enough at this size
+        — on a page of thirty rows the eye reads the block of colour down the left edge,
+        not the glyphs.
+    -->
+    <Style TargetType="CheckBox" BasedOn="{StaticResource Focus.Ring}">
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Body}" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Primary}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="MinHeight" Value="{StaticResource Control.Height.Small}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Grid Background="Transparent">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- The edge is brighter than an ordinary control's. An unticked
+                             box is a small empty square, and at this size the difference
+                             between "off" and "not there" is entirely its outline. -->
+                        <Border x:Name="Box"
+                                Grid.Column="0"
+                                Width="16"
+                                Height="16"
+                                VerticalAlignment="Center"
+                                Background="{StaticResource Surface.Sunken}"
+                                BorderBrush="{StaticResource Line.Focus}"
+                                BorderThickness="1"
+                                SnapsToDevicePixels="True">
+                            <Path x:Name="Tick"
+                                  Width="9"
+                                  Height="7"
+                                  Stretch="Uniform"
+                                  Visibility="Collapsed"
+                                  Fill="{StaticResource Accent.Ink}"
+                                  Data="M 0,3.2 L 3.1,6.3 L 8.6,0.7 L 7.6,0 L 3.1,4.6 L 0.9,2.5 Z" />
+
+                            <!-- The third state, which the helper does not use but a
+                                 tri-state binding could reach by accident. Drawn rather
+                                 than left blank, so it never reads as "off". -->
+                        </Border>
+
+                        <ContentPresenter x:Name="Label"
+                                          Grid.Column="1"
+                                          Margin="9,0,0,0"
+                                          VerticalAlignment="Center"
+                                          RecognizesAccessKey="True" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Box" Property="Background" Value="{StaticResource Accent}" />
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Accent}" />
+                            <Setter TargetName="Tick" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="{x:Null}">
+                            <Setter TargetName="Box" Property="Background" Value="{StaticResource Accent.Wash}" />
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Accent.Deep}" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Accent.Bright}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Box" Property="Background" Value="{StaticResource Surface.Sunken}" />
+                            <Setter TargetName="Box" Property="BorderBrush" Value="{StaticResource Line.Subtle}" />
+                            <Setter TargetName="Tick" Property="Fill" Value="{StaticResource Ink.Disabled}" />
+                            <Setter Property="Foreground" Value="{StaticResource Ink.Disabled}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Not used by either window today, and templated anyway: a radio button dropped in
+         later would otherwise arrive wearing the stock theme. -->
+    <Style TargetType="RadioButton" BasedOn="{StaticResource Focus.Ring}">
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Body}" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Primary}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="MinHeight" Value="{StaticResource Control.Height.Small}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Grid Background="Transparent">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Grid Grid.Column="0" Width="16" Height="16" VerticalAlignment="Center">
+                            <Ellipse x:Name="Ring"
+                                     Fill="{StaticResource Surface.Sunken}"
+                                     Stroke="{StaticResource Line.Strong}"
+                                     StrokeThickness="1" />
+                            <Ellipse x:Name="Dot"
+                                     Width="7"
+                                     Height="7"
+                                     Visibility="Collapsed"
+                                     Fill="{StaticResource Accent}" />
+                        </Grid>
+
+                        <ContentPresenter Grid.Column="1"
+                                          Margin="9,0,0,0"
+                                          VerticalAlignment="Center"
+                                          RecognizesAccessKey="True" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Ring" Property="Stroke" Value="{StaticResource Accent}" />
+                            <Setter TargetName="Dot" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Ring" Property="Stroke" Value="{StaticResource Accent.Bright}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Ring" Property="Stroke" Value="{StaticResource Line.Subtle}" />
+                            <Setter TargetName="Dot" Property="Fill" Value="{StaticResource Ink.Disabled}" />
+                            <Setter Property="Foreground" Value="{StaticResource Ink.Disabled}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ====================================================================== Switch -->
+
+    <!--
+        For the few settings that read as a state rather than as an option: windowed mode,
+        packet encryption. A switch says "this is how the thing behaves"; a tick box says
+        "this is one of a list". Mixing them arbitrarily is what makes a settings page feel
+        assembled rather than designed, so the rule is the one above and nothing else.
+    -->
+    <Style TargetType="ui:ToggleSwitch" BasedOn="{StaticResource Focus.Ring}">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ui:ToggleSwitch">
+                    <Grid Background="Transparent">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border x:Name="Track"
+                                Grid.Column="0"
+                                Width="38"
+                                Height="20"
+                                VerticalAlignment="Center"
+                                Background="{StaticResource Surface.Sunken}"
+                                BorderBrush="{StaticResource Line.Strong}"
+                                BorderThickness="1"
+                                CornerRadius="10">
+                            <Border x:Name="Knob"
+                                    Width="12"
+                                    Height="12"
+                                    Margin="3,0,0,0"
+                                    HorizontalAlignment="Left"
+                                    Background="{StaticResource Ink.Tertiary}"
+                                    CornerRadius="6" />
+                        </Border>
+
+                        <ContentPresenter Grid.Column="1"
+                                          Margin="9,0,0,0"
+                                          VerticalAlignment="Center" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Track" Property="Background" Value="{StaticResource Accent}" />
+                            <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource Accent}" />
+                            <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right" />
+                            <Setter TargetName="Knob" Property="Margin" Value="0,0,3,0" />
+                            <Setter TargetName="Knob" Property="Background" Value="{StaticResource Accent.Ink}" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource Accent.Bright}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Track" Property="Background" Value="{StaticResource Surface.Sunken}" />
+                            <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource Line.Subtle}" />
+                            <Setter TargetName="Knob" Property="Background" Value="{StaticResource Ink.Disabled}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- A bare ToggleButton, for anything that is pressed and stays pressed. -->
+    <Style TargetType="ToggleButton" BasedOn="{StaticResource Button.Base}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="Shell"
+                            Background="{StaticResource Surface.Raised}"
+                            BorderBrush="{StaticResource Line.Strong}"
+                            BorderThickness="1"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Accent.Wash}" />
+                            <Setter TargetName="Shell" Property="BorderBrush" Value="{StaticResource Accent}" />
+                            <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shell" Property="BorderBrush" Value="{StaticResource Accent.Deep}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Surface.Sunken}" />
+                            <Setter TargetName="Shell" Property="BorderBrush" Value="{StaticResource Line.Subtle}" />
+                            <Setter Property="Foreground" Value="{StaticResource Ink.Disabled}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!--
+        The column of buttons beside a list: add, remove, move up, move down.
+
+        Here rather than in each window, and that is the point. Both windows wrote their
+        own, both wrote `TargetType="ui:Button"` with no `BasedOn`, and a named style
+        without one **replaces** the implicit style outright — template included. Seven
+        buttons across two applications came out as bare framework buttons: white fill,
+        and the window's own light text on top of it, so the label was invisible. Nothing
+        errored, and the pages they were on were never rendered by a test.
+    -->
+    <Style x:Key="Button.Column" TargetType="ui:Button" BasedOn="{StaticResource {x:Type ui:Button}}">
+        <Setter Property="Appearance" Value="Secondary" />
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+
+</ResourceDictionary>

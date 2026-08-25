@@ -1,0 +1,177 @@
+<!--
+    The whole look, in one entry point. Both applications merge this and nothing else.
+
+    The order is load-bearing twice over.
+
+    The library's dictionaries come first because everything after them either replaces one
+    of their brushes or derives a style from one of theirs, and a StaticResource in a merged
+    dictionary can only see dictionaries merged before it.
+
+    Palette comes before everything of ours for the same reason, and LibraryTokens comes
+    after the library so that its keys win.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:lui="clr-namespace:Login38.Ui"
+                    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+
+    <ResourceDictionary.MergedDictionaries>
+
+        <!-- The library's own, which everything below either recolours or builds on. -->
+        <ui:ThemesDictionary Theme="Dark" />
+        <ui:ControlsDictionary />
+
+        <!-- Ours. -->
+        <ResourceDictionary Source="pack://application:,,,/Login38.Ui;component/Theme/Palette.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Login38.Ui;component/Theme/LibraryTokens.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Login38.Ui;component/Theme/Typography.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Login38.Ui;component/Theme/Primitives.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Login38.Ui;component/Theme/Buttons.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Login38.Ui;component/Theme/Inputs.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Login38.Ui;component/Theme/Collections.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Login38.Ui;component/Theme/Surfaces.xaml" />
+
+    </ResourceDictionary.MergedDictionaries>
+
+    <!--
+        The library's own controls, kept on their own templates.
+
+        These live here rather than in one of the files above, and that is not tidiness.
+        A `StaticResource {x:Type ui:Something}` written inside a merged dictionary cannot
+        see a *sibling* merged dictionary — it resolves against its own dictionary and the
+        parent chain, and the library's styles are in a sibling. Written here they are
+        entries of the parent, which can see everything merged into it.
+
+        Retemplated they are not, on purpose. A NumberBox wires spin buttons to named
+        template parts, an InfoBar switches on severity, a TitleBar owns the caption
+        buttons the window manager talks to. Copying those templates would mean owning
+        behaviour this code did not write — and the colours already come from
+        LibraryTokens, which is the part that actually needed changing.
+
+        Every one of them is *keyed*, and that is the load-bearing part. A style keyed
+        `{x:Type T}` that derives from `{StaticResource {x:Type T}}` in the same dictionary
+        asks for itself: the key it is about to occupy is the key it is looking up. What
+        comes back carries no template, so the control falls through to whatever its base
+        type has — a NumberBox came out as a white framework text box, and a TitleBar came
+        out as nothing at all, with no error either time.
+
+        Each window turns these back into implicit styles in its own Resources, which is a
+        different dictionary and so a lookup that means what it says.
+    -->
+
+    <Style x:Key="Library.TextBox" TargetType="ui:TextBox" BasedOn="{StaticResource {x:Type ui:TextBox}}">
+        <Setter Property="Background" Value="{StaticResource Surface.Sunken}" />
+        <Setter Property="BorderBrush" Value="{StaticResource Line.Strong}" />
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Body}" />
+        <Setter Property="MinHeight" Value="{StaticResource Control.Height}" />
+        <Setter Property="Padding" Value="{StaticResource Pad.Field}" />
+        <Setter Property="CaretBrush" Value="{StaticResource Accent}" />
+        <Setter Property="SelectionBrush" Value="{StaticResource Accent}" />
+        <Setter Property="SelectionOpacity" Value="0.35" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <!--
+        The number boxes are the ones that were too narrow to read: an inventory limit of
+        255 and an IMG limit of 65535 were drawn into a box sized for two digits, and with
+        the spin buttons taking their share there was nothing left for the value.
+
+        A minimum width rather than a fixed one, so a box in a wide column still fills it.
+    -->
+    <Style x:Key="Library.NumberBox" TargetType="ui:NumberBox" BasedOn="{StaticResource {x:Type ui:NumberBox}}">
+        <Setter Property="Background" Value="{StaticResource Surface.Sunken}" />
+        <Setter Property="BorderBrush" Value="{StaticResource Line.Strong}" />
+        <Setter Property="FontFamily" Value="{StaticResource Font.Figures}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Body}" />
+        <Setter Property="MinHeight" Value="{StaticResource Control.Height}" />
+        <Setter Property="MinWidth" Value="{StaticResource Field.Width}" />
+        <Setter Property="Padding" Value="{StaticResource Pad.Field}" />
+        <Setter Property="CaretBrush" Value="{StaticResource Accent}" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="Library.Card" TargetType="ui:CardControl" BasedOn="{StaticResource {x:Type ui:CardControl}}">
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="Padding" Value="{StaticResource Pad.Card}" />
+        <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+
+    <Style x:Key="Library.InfoBar" TargetType="ui:InfoBar" BasedOn="{StaticResource {x:Type ui:InfoBar}}">
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Label}" />
+    </Style>
+
+    <Style x:Key="Library.ProgressRing" TargetType="ui:ProgressRing" BasedOn="{StaticResource {x:Type ui:ProgressRing}}">
+        <Setter Property="Foreground" Value="{StaticResource Accent}" />
+    </Style>
+
+    <Style x:Key="Library.TitleBar" TargetType="ui:TitleBar" BasedOn="{StaticResource {x:Type ui:TitleBar}}">
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="ShowMaximize" Value="False" />
+
+        <!-- Closes the window rather than ending the process. The launcher decides what a
+             close means — with a game running it withdraws to the notification area — and
+             it cannot decide anything if the button has already shut the process down. -->
+        <Setter Property="ForceShutdown" Value="False" />
+    </Style>
+
+    <!--
+        The window itself.
+
+        Derived from the library's, not written fresh, and that is not a preference: a
+        Style applied by name replaces the implicit one outright, template included. Set
+        without BasedOn it left both windows with no ControlTemplate at all — they opened,
+        reported a size, and drew nothing, which no test noticed until one of them counted
+        what it had found.
+
+        By key rather than implicitly, so the windows a test builds to measure are not
+        also given window chrome they have no composition target for.
+    -->
+    <Style x:Key="Window.Shell" TargetType="ui:FluentWindow" BasedOn="{StaticResource {x:Type ui:FluentWindow}}">
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Body}" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Primary}" />
+        <Setter Property="Background" Value="{StaticResource Surface.Base}" />
+        <Setter Property="ExtendsContentIntoTitleBar" Value="True" />
+        <Setter Property="WindowCornerPreference" Value="Round" />
+
+        <!--
+            Tells the library which scheme this is. Not decoration: a few of its decisions
+            are taken in code against the theme it thinks is current rather than against
+            any brush in the dictionary, and unasked it assumes light. Both windows opened
+            with a white field behind everything the markup drew on top of it.
+        -->
+        <Setter Property="lui:Theme.Pinned" Value="True" />
+
+        <!-- Where a window opens is not set here. WindowStartupLocation is an ordinary
+             property on Window rather than a dependency property, so a Setter cannot
+             target it — and the failure is deferred until the style is realised, which is
+             the moment the window is built. -->
+
+        <!-- No Mica. The backdrop tints the window with the desktop behind it, which on a
+             scheme this dark means the panel colour is whatever wallpaper the player has —
+             and the whole point of the palette is that it does not move. -->
+        <Setter Property="WindowBackdropType" Value="None" />
+
+        <!--
+            The Background above is a fallback and nothing more. The library writes the
+            window's own fill as a *local* value while the window loads, and a local value
+            beats a style setter however specific the style — the window came out the
+            library's grey rather than this palette's black, and no test that read the
+            style could have told. What the player actually sees is painted by the root
+            element of each window, which nothing outside the window can overwrite.
+        -->
+    </Style>
+
+    <!--
+        ui:TextBlock and ui:SymbolIcon are deliberately absent.
+
+        Neither has an implicit style in the library, so there is nothing to derive from
+        and a style without one would replace a template that does not exist. Both inherit
+        the face and the colour from whatever contains them, which is what they need. The
+        windows use the framework's TextBlock with the styles in Typography, so there is
+        one type ramp rather than this control's and that one.
+    -->
+
+</ResourceDictionary>

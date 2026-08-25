@@ -1,0 +1,56 @@
+<Project>
+
+  <!--
+    Shared build settings for every project in the solution.
+
+    The x86 platform target is not a preference, it is a correctness requirement:
+    the injector resolves LoadLibraryW inside this process and then hands that
+    address to CreateRemoteThread in the 32-bit game process. Under WOW64 the two
+    kernel32 base addresses differ, so a 64-bit build would inject a bad pointer.
+    Every patch address in the reference implementation is likewise a 32-bit VA.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <Platforms>x86</Platforms>
+    <PlatformTarget>x86</PlatformTarget>
+
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+
+    <!--
+      CA1848 / CA1873 push every log call through a source-generated [LoggerMessage]
+      delegate. That is the right trade for a high-throughput service; this is a desktop
+      launcher that emits a few hundred lines over a whole session, and file logging is
+      off by default. Paying four lines of ceremony per message across the codebase
+      would cost far more readability than it buys in allocations. Hot paths that log
+      inside a polling loop should still use [LoggerMessage] explicitly.
+    -->
+    <NoWarn>$(NoWarn);CA1848;CA1873</NoWarn>
+
+    <!-- CP950 is required for every string that crosses into game memory. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <NeutralLanguage>zh-TW</NeutralLanguage>
+
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <ProduceReferenceAssembly>false</ProduceReferenceAssembly>
+    <AccelerateBuildsInVisualStudio>true</AccelerateBuildsInVisualStudio>
+
+    <Company>Lineage 3.8</Company>
+    <Product>Login38</Product>
+    <Version>1.0.0</Version>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <Optimize>true</Optimize>
+    <DebugType>none</DebugType>
+  </PropertyGroup>
+
+</Project>

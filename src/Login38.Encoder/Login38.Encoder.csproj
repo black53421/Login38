@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Server-operator tool: edits list.txt (encrypted server list + launcher config)
+    and the client .pak. Offline, never touches a running game process.
+  -->
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Login38.Encoder</RootNamespace>
+    <AssemblyName>encoder</AssemblyName>
+
+    <RuntimeIdentifier>win-x86</RuntimeIdentifier>
+
+    <!--
+      One file, and only the program in it.
+
+      Framework-dependent: the machine supplies the .NET runtime, so what an operator
+      hands out is a 9 MB executable rather than a 61 MB one, and a launcher update is 9 MB
+      again rather than the whole runtime a second time. The cost is that a player installs
+      the runtime once — and it has to be the x86 one, because this process is x86 and
+      cannot load a 64-bit runtime.
+
+      Single file all the same. The reason the loose build was a support call is that
+      somebody copied launcher.exe on its own and got told to download .NET: there was
+      nothing in it. Now there is.
+
+      Not trimmed, and not because of a preference: the SDK refuses. WPF resolves types by
+      name out of XAML, the trimmer cannot see those references, and NETSDK1168 stops the
+      build rather than shipping something that fails when a window opens.
+    -->
+    <SelfContained>false</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <PublishTrimmed>false</PublishTrimmed>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+
+    <ApplicationManifest>..\..\build\encoder.manifest</ApplicationManifest>
+    <ApplicationIcon>..\..\assets\encoder.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Login38.Core\Login38.Core.csproj" />
+    <ProjectReference Include="..\Login38.Ui\Login38.Ui.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="WPF-UI" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+  </ItemGroup>
+
+</Project>

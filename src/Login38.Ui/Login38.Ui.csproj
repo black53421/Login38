@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The look of everything the player and the operator see.
+
+    A library rather than a folder in one of the applications, because both of them draw
+    the same controls and a second copy of a colour is a second colour as soon as one of
+    them is edited. Nothing here knows what a server or a game process is.
+  -->
+
+  <PropertyGroup>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>Login38.Ui</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WPF-UI" />
+  </ItemGroup>
+
+</Project>

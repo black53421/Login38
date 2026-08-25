@@ -1,0 +1,33 @@
+# Build output
+bin/
+obj/
+artifacts/
+*.user
+.vs/
+native/ddraw_inproc/build/*.obj
+
+# --- Never publish -------------------------------------------------------------
+# An operator's generated package. pack.properties holds the RSA private exponent;
+# list.txt and config.ini are that server's encrypted settings. A player gets these
+# from their own server, never from this repository.
+dist/
+pack.properties
+list.txt
+config.ini
+launcher.ini
+*_debug.log
+
+# Game data and shipping layouts carried in for manual testing. Not source.
+runtime/
+data/SPR.txt
+
+# Working notes from the port. Local research log, not documentation.
+findings.md
+progress.md
+task_plan.md
+
+# The original Rust implementation, kept locally as the behavioural specification.
+rust-reference/
+
+# Local UI-automation helper with machine-specific paths.
+.drive.ps1

@@ -1,0 +1,14 @@
+<Application x:Class="Login38.Encoder.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnMainWindowClose">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- One entry point. It merges the library's dictionaries itself, in the
+                     order the overrides in it depend on. -->
+                <ResourceDictionary Source="pack://application:,,,/Login38.Ui;component/Theme/Theme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

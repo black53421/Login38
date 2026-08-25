@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="utf-8"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+
+  <!--
+    The operator's tool. Deliberately NOT the launcher's manifest.
+
+    asInvoker, not requireAdministrator: this never opens a game process. It reads and
+    writes files beside itself, and running it elevated would be actively worse — the files
+    it creates would be owned by Administrators, and "open the skins folder" or "edit the
+    item lists" would hand an elevated shell to whatever the operator has registered for
+    .ini and for folders.
+
+    Per-monitor DPI aware, unlike the launcher. The launcher has to stay DPI-unaware because
+    it draws over a DirectDraw surface at a fixed resolution; nothing here draws over
+    anything, so it renders at the monitor's own scale instead of being bitmap-stretched.
+  -->
+
+  <assemblyIdentity type="win32" name="Login38.Encoder" version="1.0.0.0" processorArchitecture="x86" />
+
+  <dependency>
+    <dependentAssembly>
+      <assemblyIdentity
+        type="win32"
+        name="Microsoft.Windows.Common-Controls"
+        version="6.0.0.0"
+        processorArchitecture="x86"
+        publicKeyToken="6595b64144ccf1df"
+        language="*"
+      />
+    </dependentAssembly>
+  </dependency>
+
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">PerMonitorV2</dpiAwareness>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true</dpiAware>
+      <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>
+    </windowsSettings>
+  </application>
+
+  <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
+    <application>
+      <supportedOS Id="{8e0f7a12-bfb3-4fe8-b9a5-48fd50a15a9a}" /><!-- Windows 10/11 -->
+      <supportedOS Id="{1f676c76-80e1-4239-95bb-83d0f6d0da78}" /><!-- Windows 8.1 -->
+    </application>
+  </compatibility>
+
+</assembly>

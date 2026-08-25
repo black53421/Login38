@@ -1,0 +1,344 @@
+<!--
+    Everything that shows a list: the server list, the rules, the pages.
+
+    One idea runs through all of them. A chosen row is marked by a bar down its left edge
+    and a wash of the accent, never by a box around it. Boxes stack: a selected row inside
+    a bordered list inside a bordered panel is three rectangles deep before any content is
+    drawn, which is what makes a dense settings window look like a spreadsheet.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                    xmlns:local="clr-namespace:Login38.Ui"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+    <!--
+        What this file needs, named rather than assumed.
+
+        A StaticResource inside a merged dictionary does not reliably reach a *sibling*
+        merged dictionary: it resolves against its own dictionary and what that dictionary
+        merges. So each file merges what it uses. The addresses are the same ones the theme
+        merges, and WPF hands back the same dictionary for an address it has already
+        loaded — so this costs a lookup, not a second copy.
+    -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="pack://application:,,,/Login38.Ui;component/Theme/Palette.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Login38.Ui;component/Theme/Typography.xaml" />
+        <ResourceDictionary Source="pack://application:,,,/Login38.Ui;component/Theme/Primitives.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+
+    <!-- ================================================================= Selected rows -->
+
+    <!--
+        Shared by every kind of row in either application, so a rule in the helper and a
+        server in the launcher answer "am I chosen" the same way.
+    -->
+    <ControlTemplate x:Key="Row.Template" TargetType="ContentControl">
+        <Border x:Name="Shell"
+                Background="Transparent"
+                BorderBrush="Transparent"
+                BorderThickness="{StaticResource Border.Marker}"
+                Padding="{TemplateBinding Padding}"
+                SnapsToDevicePixels="True">
+            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                              VerticalAlignment="Center" />
+        </Border>
+    </ControlTemplate>
+
+    <Style x:Key="Row.Base" TargetType="Control">
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Body}" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Primary}" />
+        <Setter Property="Padding" Value="{StaticResource Pad.Row}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <!-- ===================================================================== List box -->
+
+    <Style TargetType="ListBox">
+        <Setter Property="Background" Value="{StaticResource Surface.Sunken}" />
+        <Setter Property="BorderBrush" Value="{StaticResource Line.Subtle}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Primary}" />
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Body}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBox">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            SnapsToDevicePixels="True">
+                        <ScrollViewer Focusable="False" Padding="{TemplateBinding Padding}">
+                            <ItemsPresenter />
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="ListBoxItem" BasedOn="{StaticResource Row.Base}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ListBoxItem">
+                    <Border x:Name="Shell"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            BorderThickness="{StaticResource Border.Marker}"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Surface.Hover}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Accent.Wash}" />
+                            <Setter TargetName="Shell" Property="BorderBrush" Value="{StaticResource Accent}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource Ink.Disabled}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ================================================================= Library list -->
+
+    <!--
+        The launcher's server list. Templated outright rather than derived from the
+        library's default, which is what a StaticResource BasedOn against ListViewItem
+        cannot reach anyway — the framework's own default lives in the theme dictionary and
+        threw while the markup was being read.
+    -->
+    <Style TargetType="ui:ListView">
+        <Setter Property="Background" Value="{StaticResource Surface.Sunken}" />
+        <Setter Property="BorderBrush" Value="{StaticResource Line.Subtle}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Primary}" />
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Disabled" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ui:ListView">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            SnapsToDevicePixels="True">
+                        <ScrollViewer Focusable="False" Padding="{TemplateBinding Padding}">
+                            <ItemsPresenter />
+                        </ScrollViewer>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="ui:ListViewItem" BasedOn="{StaticResource Row.Base}">
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ui:ListViewItem">
+                    <Border x:Name="Shell"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            BorderThickness="{StaticResource Border.Marker}"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Surface.Hover}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Accent.Wash}" />
+                            <Setter TargetName="Shell" Property="BorderBrush" Value="{StaticResource Accent}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource Ink.Disabled}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Neither window uses the framework's own list view today. Templated all the same:
+         a list dropped in later would otherwise arrive wearing the stock theme, which is
+         exactly how a restyled interface ends up half-done. -->
+    <Style TargetType="ListView" BasedOn="{StaticResource {x:Type ListBox}}" />
+
+    <Style TargetType="ListViewItem" BasedOn="{StaticResource {x:Type ListBoxItem}}" />
+
+    <Style TargetType="GridViewColumnHeader">
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Caption}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Tertiary}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="HorizontalContentAlignment" Value="Left" />
+        <Setter Property="Padding" Value="12,8" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="GridViewColumnHeader">
+                    <Border Background="{TemplateBinding Background}"
+                            BorderBrush="{StaticResource Line.Subtle}"
+                            BorderThickness="0,0,0,1"
+                            Padding="{TemplateBinding Padding}">
+                        <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ============================================================= Navigation rail -->
+
+    <!--
+        Pages down the left rather than tabs across the top.
+
+        Seven pages in the helper and six in the encoder is past what a strip of tabs can
+        label without truncating, and a rail keeps the whole list readable while a page is
+        open. The chosen page is marked the same way a chosen row is — a bar and a wash —
+        so the window has one idea of "this is the one", not two.
+    -->
+    <sys:Double x:Key="Rail.Width">176</sys:Double>
+
+    <Style TargetType="TabItem">
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Body}" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Secondary}" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabItem">
+                    <Border x:Name="Shell"
+                            Background="Transparent"
+                            BorderBrush="Transparent"
+                            BorderThickness="{StaticResource Border.Marker}"
+                            Padding="14,9"
+                            SnapsToDevicePixels="True">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <ContentPresenter x:Name="Symbol"
+                                              Grid.Column="0"
+                                              Margin="0,0,10,0"
+                                              VerticalAlignment="Center"
+                                              Content="{Binding Path=(local:Rail.Icon), RelativeSource={RelativeSource TemplatedParent}}" />
+
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <ContentPresenter ContentSource="Header" VerticalAlignment="Center" />
+                                <TextBlock x:Name="Note"
+                                           Style="{StaticResource Text.Caption}"
+                                           Margin="0,1,0,0"
+                                           Text="{Binding Path=(local:Rail.Note), RelativeSource={RelativeSource TemplatedParent}}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <!-- A page with no symbol is drawn without one rather than with a
+                             gap where one would be. -->
+                        <DataTrigger Binding="{Binding Path=(local:Rail.Icon), RelativeSource={RelativeSource Self}}" Value="{x:Null}">
+                            <Setter TargetName="Symbol" Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding Path=(local:Rail.Note), RelativeSource={RelativeSource Self}}" Value="">
+                            <Setter TargetName="Note" Property="Visibility" Value="Collapsed" />
+                        </DataTrigger>
+
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Surface.Hover}" />
+                            <Setter Property="Foreground" Value="{StaticResource Ink.Primary}" />
+                        </Trigger>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter TargetName="Shell" Property="Background" Value="{StaticResource Accent.Wash}" />
+                            <Setter TargetName="Shell" Property="BorderBrush" Value="{StaticResource Accent}" />
+                            <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+
+                            <!-- The note comes up a shade with the row. The wash behind a
+                                 selected page is lighter than the rail, and a caption left
+                                 on the shade chosen for the rail is the one line in the
+                                 window that got harder to read by being selected. -->
+                            <Setter TargetName="Note" Property="Foreground" Value="{StaticResource Ink.Secondary}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource Ink.Disabled}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="TabControl">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Primary}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TabControl">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0"
+                                Width="{StaticResource Rail.Width}"
+                                Background="{StaticResource Surface.Void}"
+                                BorderBrush="{StaticResource Line.Subtle}"
+                                BorderThickness="0,0,1,0">
+                            <ScrollViewer Padding="0,8">
+                                <StackPanel IsItemsHost="True" />
+                            </ScrollViewer>
+                        </Border>
+
+                        <Border Grid.Column="1"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}">
+
+                            <!-- The name is not decoration. TabControl finds its content
+                                 host by it and hands the selected page over; a presenter
+                                 without it is one that never receives anything, and every
+                                 page comes out empty. -->
+                            <ContentPresenter x:Name="PART_SelectedContentHost"
+                                              ContentSource="SelectedContent" />
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- =============================================================== Plain item host -->
+
+    <!--
+        ItemsControl has no template of its own worth replacing — it is a panel with a
+        border — but it does inherit the font, and a repeated row that inherits nothing
+        else is the one place a stray face shows up.
+    -->
+    <Style TargetType="ItemsControl">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Primary}" />
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Body}" />
+    </Style>
+
+</ResourceDictionary>

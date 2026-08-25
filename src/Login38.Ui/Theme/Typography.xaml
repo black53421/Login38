@@ -1,0 +1,123 @@
+<!--
+    Every size of text in the two applications.
+
+    Six steps, which is as many as an interface this size can use before two of them start
+    meaning the same thing. Everything that shows text keys off one of these rather than
+    setting a size, so the whole scale moves together.
+
+    The face is named rather than inherited. Both applications are entirely in Traditional
+    Chinese and Segoe UI has no Han glyphs, so leaving it to the default means every label
+    falls through to whatever the system picks — a different font on a different machine.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+    <!--
+        What this file needs, named rather than assumed.
+
+        A StaticResource inside a merged dictionary does not reliably reach a *sibling*
+        merged dictionary: it resolves against its own dictionary and what that dictionary
+        merges. So each file merges what it uses. The addresses are the same ones the theme
+        merges, and WPF hands back the same dictionary for an address it has already
+        loaded — so this costs a lookup, not a second copy.
+    -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="pack://application:,,,/Login38.Ui;component/Theme/Palette.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+
+    <FontFamily x:Key="Font.Ui">Microsoft JhengHei UI, Segoe UI, Microsoft YaHei UI</FontFamily>
+
+    <!-- For anything the eye has to compare column-wise: addresses, ports, key parts,
+         byte counts. Proportional digits make two numbers of the same length look
+         different lengths. -->
+    <FontFamily x:Key="Font.Figures">Cascadia Mono, Consolas, Courier New</FontFamily>
+
+    <sys:Double x:Key="Size.Display">24</sys:Double>
+    <sys:Double x:Key="Size.Title">17</sys:Double>
+    <sys:Double x:Key="Size.Subtitle">14</sys:Double>
+    <sys:Double x:Key="Size.Body">13</sys:Double>
+    <sys:Double x:Key="Size.Label">12</sys:Double>
+    <sys:Double x:Key="Size.Caption">11</sys:Double>
+
+    <!-- ==================================================================== Base text -->
+
+    <Style x:Key="Text.Base" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Body}" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Primary}" />
+        <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+        <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+    </Style>
+
+    <!-- The name of the application, in the title bar and nowhere else. -->
+    <Style x:Key="Text.Display" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+        <Setter Property="FontSize" Value="{StaticResource Size.Display}" />
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+
+    <Style x:Key="Text.Title" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+        <Setter Property="FontSize" Value="{StaticResource Size.Title}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style x:Key="Text.Subtitle" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+        <Setter Property="FontSize" Value="{StaticResource Size.Subtitle}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style x:Key="Text.Body" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}" />
+
+    <Style x:Key="Text.Strong" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+        <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+
+    <!-- What a control is called, beside it. -->
+    <Style x:Key="Text.Label" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+        <Setter Property="FontSize" Value="{StaticResource Size.Label}" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Secondary}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <!-- The sentence under a control explaining what it does. -->
+    <Style x:Key="Text.Caption" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+        <Setter Property="FontSize" Value="{StaticResource Size.Caption}" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Tertiary}" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+
+    <!--
+        A section heading: small, spaced out, and quiet.
+
+        Wide letter spacing rather than a large size. A heading has to be found, not read,
+        and spacing marks it as a heading at a size small enough that it does not compete
+        with the values underneath — which on a settings page are the point.
+    -->
+    <Style x:Key="Text.Section" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+        <Setter Property="FontSize" Value="{StaticResource Size.Caption}" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Tertiary}" />
+        <Setter Property="TextBlock.TextAlignment" Value="Left" />
+
+        <!-- Applied as a typography feature rather than by padding each character, so
+             selecting the text still yields the text. -->
+        <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+    </Style>
+
+    <Style x:Key="Text.Figures" TargetType="TextBlock" BasedOn="{StaticResource Text.Base}">
+        <Setter Property="FontFamily" Value="{StaticResource Font.Figures}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Label}" />
+        <Setter Property="Foreground" Value="{StaticResource Ink.Secondary}" />
+    </Style>
+
+    <!-- ================================================================ Default for all -->
+
+    <!--
+        The implicit style, so a bare TextBlock anywhere in either application is already
+        the right face and colour. Without it, every one of the sixty-odd labels would
+        have to name a style and the one that was missed would be the one that looked
+        wrong on somebody else's machine.
+    -->
+    <Style TargetType="TextBlock" BasedOn="{StaticResource Text.Base}" />
+
+</ResourceDictionary>

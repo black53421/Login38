@@ -1,0 +1,264 @@
+<ui:FluentWindow x:Class="Login38.App.Views.MainWindow"
+                 xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                 xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                 xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+                 xmlns:lui="clr-namespace:Login38.Ui;assembly=Login38.Ui"
+                 xmlns:vm="clr-namespace:Login38.App.ViewModels"
+                 xmlns:views="clr-namespace:Login38.App.Views"
+                 d:DataContext="{d:DesignInstance Type=vm:MainViewModel}"
+                 xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                 xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                 mc:Ignorable="d"
+                 Style="{StaticResource Window.Shell}"
+                 WindowStartupLocation="CenterScreen"
+                 Title="天堂 3.8 登入器"
+                 Width="960"
+                 Height="620"
+                 MinWidth="820"
+                 MinHeight="560">
+
+    <ui:FluentWindow.Resources>
+        <!--
+            The library's controls, adopted.
+
+            The theme keeps these keyed rather than implicit: a style keyed on a type that
+            derives from the style keyed on the same type is a style that asks for itself,
+            and what comes back has no template. Turning them back into implicit styles
+            here works because a window's own Resources is a different dictionary, so the
+            lookup finds the theme's entry rather than the one being written.
+        -->
+        <Style TargetType="ui:TitleBar" BasedOn="{StaticResource Library.TitleBar}" />
+        <Style TargetType="ui:TextBox" BasedOn="{StaticResource Library.TextBox}" />
+        <Style TargetType="ui:NumberBox" BasedOn="{StaticResource Library.NumberBox}" />
+        <Style TargetType="ui:InfoBar" BasedOn="{StaticResource Library.InfoBar}" />
+        <Style TargetType="ui:CardControl" BasedOn="{StaticResource Library.Card}" />
+        <Style TargetType="ui:ProgressRing" BasedOn="{StaticResource Library.ProgressRing}" />
+
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibility" />
+        <views:StringPresentConverter x:Key="StringPresent" />
+        <views:FallbackTextConverter x:Key="FallbackText" />
+        <views:WindowModeNameConverter x:Key="WindowModeName" />
+    </ui:FluentWindow.Resources>
+
+    <!-- The window paints its own background rather than leaving it to the window's
+         Background property. The control library writes that one as a local value while
+         the window loads, which beats anything a style can say, and what came out was the
+         library's grey and not this palette's black. Painted here it is the palette's, and
+         it stays the palette's whatever the library decides. -->
+    <Grid Background="{StaticResource Surface.Base}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!--
+            The title bar carries the mark rather than a plain caption. It is the first
+            thing on screen and the only place the launcher says what it is.
+        -->
+        <ui:TitleBar Grid.Row="0" Height="44">
+            <ui:TitleBar.Header>
+                <StackPanel Orientation="Horizontal" Margin="16,0,0,0" VerticalAlignment="Center">
+                    <Border Width="3"
+                            Height="16"
+                            Margin="0,0,10,0"
+                            VerticalAlignment="Center"
+                            Background="{StaticResource Accent}" />
+                    <TextBlock Style="{StaticResource Text.Strong}"
+                               VerticalAlignment="Center"
+                               Text="天堂 3.8" />
+                    <TextBlock Style="{StaticResource Text.Label}"
+                               Margin="8,0,0,0"
+                               VerticalAlignment="Center"
+                               Text="登入器" />
+                </StackPanel>
+            </ui:TitleBar.Header>
+        </ui:TitleBar>
+
+        <Grid Grid.Row="1" Margin="20,4,20,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="330" />
+            </Grid.ColumnDefinitions>
+
+            <!-- ============================================================ Servers -->
+
+            <DockPanel Grid.Column="0">
+                <Grid DockPanel.Dock="Top" Margin="0,0,0,10">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Style="{StaticResource Text.Section}" Text="伺服器" />
+                        <TextBlock Style="{StaticResource Text.Figures}"
+                                   Margin="10,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Text="{Binding Servers.Count, StringFormat='{}{0} 台'}" />
+                    </StackPanel>
+
+                    <ui:Button HorizontalAlignment="Right"
+                               Appearance="Transparent"
+                               Icon="{ui:SymbolIcon ArrowClockwise24}"
+                               Content="重新整理"
+                               Command="{Binding RefreshAvailabilityCommand}" />
+                </Grid>
+
+                <ui:InfoBar DockPanel.Dock="Bottom"
+                            Margin="0,10,0,0"
+                            Severity="Error"
+                            IsClosable="False"
+                            Title="無法繼續"
+                            Message="{Binding Error}"
+                            IsOpen="{Binding Error, Converter={StaticResource StringPresent}, Mode=OneWay}" />
+
+                <!--
+                    The list and its rows are the library's own, not the framework's. A
+                    framework ListViewItem's default style lives in the theme dictionary,
+                    which StaticResource does not reach, so a BasedOn against it threw
+                    while the markup was being read and the launcher did not start.
+                -->
+                <ui:ListView ItemsSource="{Binding Servers}"
+                             SelectedItem="{Binding SelectedServer, Mode=TwoWay}">
+                    <ui:ListView.ItemTemplate>
+                        <DataTemplate DataType="{x:Type vm:ServerEntryViewModel}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <lui:StatusDot x:Name="Dot"
+                                               Grid.Column="0"
+                                               Margin="0,0,14,0"
+                                               Fill="{StaticResource Signal.Idle}" />
+
+                                <!-- The name and nothing else. The address is the
+                                     operator's business, not the player's: it is in the
+                                     list file, it changes without the player being told,
+                                     and printing it on the front of the launcher is
+                                     publishing it to whoever is watching them play. -->
+                                <TextBlock Grid.Column="1"
+                                           Style="{StaticResource Text.Strong}"
+                                           VerticalAlignment="Center"
+                                           Text="{Binding Name}" />
+
+                                <TextBlock x:Name="State"
+                                           Grid.Column="2"
+                                           Style="{StaticResource Text.Caption}"
+                                           VerticalAlignment="Center"
+                                           Text="檢查中" />
+                            </Grid>
+
+                            <DataTemplate.Triggers>
+                                <!-- Three states, not two. A server nobody has asked yet
+                                     is not a server that is down, and drawing it as down
+                                     would be a lie for the second the check takes. -->
+                                <DataTrigger Binding="{Binding Availability}" Value="Online">
+                                    <Setter TargetName="Dot" Property="Fill" Value="{StaticResource Signal.Good}" />
+                                    <Setter TargetName="Dot" Property="IsLit" Value="True" />
+                                    <Setter TargetName="State" Property="Text" Value="連線正常" />
+                                    <Setter TargetName="State" Property="Foreground" Value="{StaticResource Signal.Good}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Availability}" Value="Offline">
+                                    <Setter TargetName="Dot" Property="Fill" Value="{StaticResource Signal.Bad}" />
+                                    <Setter TargetName="State" Property="Text" Value="離線" />
+                                    <Setter TargetName="State" Property="Foreground" Value="{StaticResource Signal.Bad}" />
+                                </DataTrigger>
+                            </DataTemplate.Triggers>
+                        </DataTemplate>
+                    </ui:ListView.ItemTemplate>
+                </ui:ListView>
+            </DockPanel>
+
+            <!-- ======================================================= Settings, launch -->
+
+            <DockPanel Grid.Column="2">
+                <StackPanel DockPanel.Dock="Top">
+                    <lui:Section Header="顯示" Note="在客戶端啟動前套用,啟動後改動要下次才生效。">
+                        <StackPanel>
+                            <lui:FieldRow Header="視窗模式" LabelWidth="96">
+                                <ui:ToggleSwitch IsChecked="{Binding Windowed, Mode=TwoWay}" />
+                            </lui:FieldRow>
+
+                            <lui:FieldRow Header="視窗大小"
+                                          LabelWidth="96"
+                                          IsEnabled="{Binding Windowed}">
+                                <ComboBox MinWidth="150"
+                                          ItemsSource="{Binding WindowModes}"
+                                          SelectedItem="{Binding WindowMode, Mode=TwoWay}">
+                                    <ComboBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="{Binding Converter={StaticResource WindowModeName}}" />
+                                        </DataTemplate>
+                                    </ComboBox.ItemTemplate>
+                                </ComboBox>
+                            </lui:FieldRow>
+                        </StackPanel>
+                    </lui:Section>
+                </StackPanel>
+
+                <StackPanel DockPanel.Dock="Bottom">
+
+                    <!-- What the launcher is doing. A panel rather than a loose line, so
+                         the space it needs is reserved whether or not it has anything to
+                         say and the button below never moves. -->
+                    <Border Style="{StaticResource Panel.Sunken}"
+                            MinHeight="62"
+                            Margin="0,0,0,14"
+                            Padding="12,10">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <ui:ProgressRing Grid.Column="0"
+                                             Width="16"
+                                             Height="16"
+                                             Margin="0,1,10,0"
+                                             VerticalAlignment="Top"
+                                             IsIndeterminate="True"
+                                             Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibility}}" />
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Style="{StaticResource Text.Section}" Text="狀態" Margin="0,0,0,4" />
+                                <TextBlock Style="{StaticResource Text.Caption}"
+                                           Text="{Binding Status, Converter={StaticResource FallbackText}, ConverterParameter='待命中,選一台伺服器就可以開始。'}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <ui:Button Content="開始遊戲"
+                               Appearance="Primary"
+                               Icon="{ui:SymbolIcon Play24}"
+                               HorizontalAlignment="Stretch"
+                               Command="{Binding LaunchCommand}" />
+
+                    <!-- The helper's settings are not offered here. They belong to the
+                         character playing, and there is no character until somebody is in
+                         the world — so the way in is Home, in the game. A button here
+                         would open a window onto nobody. -->
+                    <TextBlock Style="{StaticResource Text.Caption}"
+                               Margin="0,10,0,0"
+                               TextWrapping="Wrap"
+                               Text="進到遊戲世界後,按 Home 叫出輔助設定(第一次會一併啟動),之後 Insert 開關、Home 收合。"
+                               Visibility="{Binding IsGameRunning, Converter={StaticResource BooleanToVisibility}}" />
+
+                    <StackPanel Orientation="Horizontal" Margin="0,14,0,0">
+                        <ui:HyperlinkButton Content="官方網站"
+                                            Command="{Binding OpenLinkCommand}"
+                                            CommandParameter="{Binding OfficialUrl}" />
+                        <TextBlock Style="{StaticResource Text.Caption}"
+                                   Margin="10,0"
+                                   VerticalAlignment="Center"
+                                   Text="·" />
+                        <ui:HyperlinkButton Content="客服"
+                                            Command="{Binding OpenLinkCommand}"
+                                            CommandParameter="{Binding SupportUrl}" />
+                    </StackPanel>
+                </StackPanel>
+
+                <Border />
+            </DockPanel>
+        </Grid>
+
+    </Grid>
+</ui:FluentWindow>

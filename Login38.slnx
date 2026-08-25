@@ -1,0 +1,48 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Login38.App/Login38.App.csproj">
+      <Platform Project="x86" />
+    </Project>
+    <Project Path="src/Login38.Aux/Login38.Aux.csproj">
+      <Platform Project="x86" />
+    </Project>
+    <Project Path="src/Login38.Core/Login38.Core.csproj">
+      <Platform Project="x86" />
+    </Project>
+    <Project Path="src/Login38.Encoder/Login38.Encoder.csproj">
+      <Platform Project="x86" />
+    </Project>
+    <Project Path="src/Login38.Interop/Login38.Interop.csproj">
+      <Platform Project="x86" />
+    </Project>
+    <Project Path="src/Login38.Patching/Login38.Patching.csproj">
+      <Platform Project="x86" />
+    </Project>
+    <Project Path="src/Login38.Ui/Login38.Ui.csproj">
+      <Platform Project="x86" />
+    </Project>
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Login38.App.Tests/Login38.App.Tests.csproj">
+      <Platform Project="x86" />
+    </Project>
+    <Project Path="tests/Login38.Aux.Tests/Login38.Aux.Tests.csproj">
+      <Platform Project="x86" />
+    </Project>
+    <Project Path="tests/Login38.Core.Tests/Login38.Core.Tests.csproj">
+      <Platform Project="x86" />
+    </Project>
+    <Project Path="tests/Login38.Encoder.Tests/Login38.Encoder.Tests.csproj">
+      <Platform Project="x86" />
+    </Project>
+    <Project Path="tests/Login38.Interop.Tests/Login38.Interop.Tests.csproj">
+      <Platform Project="x86" />
+    </Project>
+    <Project Path="tests/Login38.Patching.Tests/Login38.Patching.Tests.csproj">
+      <Platform Project="x86" />
+    </Project>
+    <Project Path="tests/Login38.TestSupport/Login38.TestSupport.csproj">
+      <Platform Project="x86" />
+    </Project>
+  </Folder>
+</Solution>

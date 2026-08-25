@@ -1,0 +1,16 @@
+# Let git normalise text on the way in, and check out with the platform default.
+* text=auto
+
+# Shell scripts must stay LF: check.sh is run by bash, and CRLF makes it fail with
+# an unreadable "\r: command not found".
+*.sh text eol=lf
+
+# PowerShell 5.1 reads .ps1 as ANSI unless the file has a UTF-8 BOM, so these carry
+# one. Marking them binary keeps git from touching the bytes.
+build/publish.ps1 -text
+build/release-readme.txt -text
+
+*.ico binary
+*.png binary
+*.dll binary
+*.rgba binary

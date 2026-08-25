@@ -1,0 +1,54 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Everything in this solution is PlatformTarget=x86, including the test projects,
+      # so the test host is a 32-bit process and needs the 32-bit desktop runtime. The
+      # runner image ships only the x64 one. Installing into "Program Files (x86)\dotnet"
+      # is where an x86 apphost looks, so nothing else has to be told about it.
+      - name: Install the x86 .NET Desktop Runtime
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://dot.net/v1/dotnet-install.ps1 -OutFile dotnet-install.ps1
+          ./dotnet-install.ps1 -Runtime windowsdesktop -Channel 10.0 -Architecture x86 `
+                               -InstallDir "$env:ProgramFiles(x86)\dotnet"
+
+      - name: Build
+        run: dotnet build Login38.slnx -c Release --nologo
+
+      - name: Test
+        run: dotnet test Login38.slnx -c Release --nologo --no-build
+
+      - name: Publish
+        shell: pwsh
+        run: ./build/publish.ps1 -Zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Login38-win-x86
+          path: artifacts/release/
+
+      # Tag pushes only. A release built from anything but a tag has no version to be.
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.zip
+          generate_release_notes: true

@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Remote memory patches applied to the game process from stage 2. -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\Login38.Core\Login38.Core.csproj" />
+    <ProjectReference Include="..\Login38.Interop\Login38.Interop.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The C++ present hook, embedded so the launcher ships as one file. It is written
+         out to %LOCALAPPDATA% and injected once the game window is up. -->
+    <EmbeddedResource Include="../../native/ddraw_inproc/build/l38ddraw.dll"
+                      LogicalName="Login38.Patching.l38ddraw.dll" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Shellcode builders are internal: they are an implementation detail of a patch,
+         but they are also the part most worth testing directly. -->
+    <InternalsVisibleTo Include="Login38.Patching.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+    <PackageReference Include="Microsoft.Extensions.Options" />
+  </ItemGroup>
+
+</Project>
