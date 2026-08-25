@@ -19,16 +19,21 @@ jobs:
         with:
           dotnet-version: '10.0.x'
 
-      # Everything in this solution is PlatformTarget=x86, including the test projects,
-      # so the test host is a 32-bit process and needs the 32-bit desktop runtime. The
-      # runner image ships only the x64 one. Installing into "Program Files (x86)\dotnet"
-      # is where an x86 apphost looks, so nothing else has to be told about it.
+      # Everything in this solution is PlatformTarget=x86, including the test projects, so
+      # the test host is a 32-bit process and needs the 32-bit desktop runtime. The runner
+      # image ships only the x64 one.
+      #
+      # DOTNET_ROOT_X86 is not optional here. setup-dotnet points DOTNET_ROOT at its x64
+      # install, and without the x86 variable the 32-bit host follows it, loads a 64-bit
+      # hostfxr.dll and aborts the run with HRESULT 0x800700C1.
       - name: Install the x86 .NET Desktop Runtime
         shell: pwsh
         run: |
-          Invoke-WebRequest https://dot.net/v1/dotnet-install.ps1 -OutFile dotnet-install.ps1
-          ./dotnet-install.ps1 -Runtime windowsdesktop -Channel 10.0 -Architecture x86 `
-                               -InstallDir "$env:ProgramFiles(x86)\dotnet"
+          $root = "${env:ProgramFiles(x86)}\dotnet"
+          $script = Join-Path $env:RUNNER_TEMP 'dotnet-install.ps1'
+          Invoke-WebRequest https://dot.net/v1/dotnet-install.ps1 -OutFile $script
+          & $script -Runtime windowsdesktop -Channel 10.0 -Architecture x86 -InstallDir $root
+          "DOTNET_ROOT_X86=$root" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Build
         run: dotnet build Login38.slnx -c Release --nologo
