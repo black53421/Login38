@@ -13,17 +13,16 @@ namespace Login38.Aux.Toggles;
 /// it hard to see what is happening. One flag decides whether that layer is drawn.
 /// </para>
 /// <para>
-/// The client writes this flag itself, on entering and leaving water — which is why the
-/// state is read back and re-asserted every pass rather than written once when the switch
-/// moves, and why switching off does not write the other value over whatever is there.
+/// The client writes this flag when the player enters water, and leaves it alone
+/// otherwise. So the pump writes once on the way in and puts back what it found on the way
+/// out, rather than asserting a value every pass.
 /// </para>
 /// <para>
-/// That second part was missing, and it was visible from inside the game. On a map with no
-/// sea in it the client leaves the flag at 0, and a switched-off pump wrote 1 over that
-/// twice a second: water appeared on dry ground, and ticking the box was what made the
-/// game look right. The reference guarded against this and the guard did not survive the
-/// port — it was a process-wide static, which had its own fault, and dropping the static
-/// dropped the guard with it.
+/// Both halves of that were wrong at some point and both were visible from inside the
+/// game. Asserting the off value every pass wrote 1 onto maps with no sea in them, where
+/// the client had left 0 — dry ground grew water, and ticking the box was what made the
+/// game look right. Writing nothing at all on the way out fixed that and broke the other
+/// half: the water never came back until the player next touched some.
 /// </para>
 /// </remarks>
 public sealed class UnderwaterPumpToggle : ByteToggle

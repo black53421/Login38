@@ -30,8 +30,6 @@ public sealed class RemoteProcess : IDisposable
         | MemoryProtection.Execute | MemoryProtection.ExecuteRead
         | MemoryProtection.ExecuteReadWrite | MemoryProtection.ExecuteWriteCopy;
 
-    private static readonly TimeSpan ExitPollInterval = TimeSpan.FromMilliseconds(250);
-
     private readonly SafeProcessHandle _handle;
 
     internal RemoteProcess(SafeProcessHandle handle, uint processId)
@@ -65,12 +63,69 @@ public sealed class RemoteProcess : IDisposable
     public bool IsRunning => Kernel32.WaitForProcess(_handle, 0) == WaitResult.Timeout;
 
     /// <summary>Waits for the process to exit.</summary>
+    /// <remarks>
+    /// A wait rather than a poll. A process handle is signalled the moment the process ends,
+    /// so the thread pool can hand this back at that instant; the reference polled, and so
+    /// did the first version of this. Quarter of a second of a launcher that has not noticed
+    /// yet does not sound like much, and it sits on the one transition the player is looking
+    /// straight at — the game closing.
+    /// </remarks>
     public async Task WaitForExitAsync(CancellationToken cancellationToken = default)
     {
-        while (IsRunning)
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!IsRunning)
         {
-            await Task.Delay(ExitPollInterval, cancellationToken).ConfigureAwait(false);
+            return;
         }
+
+        var exited = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // Borrowed rather than owned, and counted: the wait must not close the handle the
+        // rest of this class reads through, and the handle must not go away underneath a
+        // registered wait.
+        var borrowed = false;
+        _handle.DangerousAddRef(ref borrowed);
+
+        try
+        {
+            using var waitable = new BorrowedHandle(_handle);
+
+            var registered = ThreadPool.RegisterWaitForSingleObject(
+                waitable,
+                static (state, _) => ((TaskCompletionSource)state!).TrySetResult(),
+                exited,
+                Timeout.Infinite,
+                executeOnlyOnce: true);
+
+            try
+            {
+                await exited.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                registered.Unregister(null);
+            }
+        }
+        finally
+        {
+            if (borrowed)
+            {
+                _handle.DangerousRelease();
+            }
+        }
+    }
+
+    /// <summary>A wait handle over a process handle this class already holds.</summary>
+    /// <remarks>
+    /// <see cref="WaitHandle"/> is the only thing the thread pool waits on, and the
+    /// framework offers no public one for a process opened by handle. It owns nothing:
+    /// closing it would take away the handle every read here goes through.
+    /// </remarks>
+    private sealed class BorrowedHandle : WaitHandle
+    {
+        internal BorrowedHandle(SafeProcessHandle process) =>
+            SafeWaitHandle = new SafeWaitHandle(process.DangerousGetHandle(), ownsHandle: false);
     }
 
     // ---- reading -------------------------------------------------------------------

@@ -24,6 +24,8 @@ public sealed class InstanceSlot : IDisposable
     private readonly Thread? _owner;
     private readonly ManualResetEventSlim? _release;
 
+    private bool _released;
+
     private InstanceSlot(string? name, Thread? owner, ManualResetEventSlim? release)
     {
         Name = name;
@@ -93,13 +95,21 @@ public sealed class InstanceSlot : IDisposable
         return null;
     }
 
+    /// <summary>Gives the slot back.</summary>
+    /// <remarks>
+    /// Called twice on the ordinary path: once the moment the game exits, because a slot
+    /// stands for a running game and there is no longer one, and again when the session it
+    /// belongs to is disposed. The second call has to be free — a slot that threw the
+    /// second time would take the launcher's own shutdown down with it.
+    /// </remarks>
     public void Dispose()
     {
-        if (_release is null)
+        if (_release is null || _released)
         {
             return;
         }
 
+        _released = true;
         _release.Set();
 
         // Bounded: a slot that somehow cannot be released should not stop the launcher

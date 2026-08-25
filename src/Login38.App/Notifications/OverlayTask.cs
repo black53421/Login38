@@ -67,14 +67,27 @@ public sealed class OverlayTask : IAuxTask, IAuxTaskShutdown
             return;
         }
 
+        var board = _board.Snapshot();
+
+        // Read before the artwork is: a player who never picks anything up never has the
+        // client's archives opened, and never has a window made for them.
+        if (board.IsEmpty)
+        {
+            Hide();
+
+            return;
+        }
+
         Ready(context.Process.Id);
 
         _window ??= GameWindow.Find(context.Process.Id);
 
         var where = _window is null
             ? null
-            : OverlayPlacement.Where(new OverlayPlacement.WindowState(
-                _window.IsVisible, _window.IsMinimised, _window.IsForeground, _window.ClientArea()));
+            : OverlayPlacement.Where(
+                new OverlayPlacement.WindowState(
+                    _window.IsVisible, _window.IsMinimised, _window.IsForeground, _window.ClientArea()),
+                anythingToShow: !board.IsEmpty);
 
         if (where is not { } area)
         {
@@ -83,10 +96,7 @@ public sealed class OverlayTask : IAuxTask, IAuxTaskShutdown
             return;
         }
 
-        var board = _board.Snapshot();
-        var now = _board.Elapsed;
-
-        Post(overlay => overlay.Draw(area, board, now));
+        Post(overlay => overlay.Draw(area, board, _board.Elapsed));
     }
 
     /// <inheritdoc/>

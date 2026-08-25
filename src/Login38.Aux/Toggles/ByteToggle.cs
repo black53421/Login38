@@ -61,6 +61,14 @@ public abstract class ByteToggle : IGameToggle
     private readonly ILogger _logger;
     private bool _reported;
 
+    /// <summary>What was at the address before this launcher changed it, if it did.</summary>
+    /// <remarks>
+    /// Per toggle instance, which is per game. The reference kept the same idea in a
+    /// process-wide static, so a second client found the flag already dealt with and
+    /// silently got nothing.
+    /// </remarks>
+    private byte[]? _overwrote;
+
     protected ByteToggle(ILogger logger) => _logger = logger;
 
     /// <inheritdoc/>
@@ -100,23 +108,24 @@ public abstract class ByteToggle : IGameToggle
     /// </summary>
     /// <remarks>
     /// <para>
-    /// A patched instruction has an original, and switching off means putting it back. A
-    /// flag the client rewrites whenever the player enters or leaves water has no
-    /// original: whatever it holds is what the map calls for, and writing the "off" value
-    /// over it is not a restore but a change.
+    /// A patched instruction has an original, and switching off means putting it back —
+    /// the same bytes, always. A flag the client sets when the player enters water has no
+    /// such original: what belongs there depends on where the character is standing, and
+    /// the two switch values are the two things it can legitimately be.
     /// </para>
     /// <para>
-    /// That is not hypothetical. The sea-water flag reads 0 on a map with no sea in it,
-    /// and a switched-off pump wrote 1 over that twice a second — so dry ground grew
-    /// water, and ticking the box was what made the game look right. Where this is true,
-    /// off means writing nothing at all.
+    /// So switching one of these off does not write the "off" value. It writes back
+    /// <em>what was actually there</em> when it was switched on, and only if it was this
+    /// launcher that changed it. Writing the off value unconditionally is what the
+    /// reference did, and it put water on dry ground: the sea-water flag reads 0 on a map
+    /// with no sea in it, and a switched-off pump wrote 1 over that.
     /// </para>
     /// <para>
-    /// Nothing is remembered about what was written, deliberately. Undoing "our own" write
-    /// needs a rule for what to put back, and there is none: the launcher cannot tell
-    /// whether this map's own value is the one it overwrote or the other one. Leaving it
-    /// costs the player nothing they will notice — the client sets the flag again the next
-    /// time they touch water, which is the only place the flag is visible.
+    /// One case is left imperfect, and it is the reference's too. A player who switches
+    /// the pump on while under water, swims out, and only then switches it off gets the
+    /// value from the water written onto dry ground. Telling that apart needs to know
+    /// where the character is, which this flag does not say — and it corrects itself the
+    /// next time they enter and leave water.
     /// </para>
     /// </remarks>
     public virtual bool ClientOwned => false;
@@ -126,9 +135,9 @@ public abstract class ByteToggle : IGameToggle
     {
         ArgumentNullException.ThrowIfNull(process);
 
-        if (!wanted && ClientOwned)
+        if (ClientOwned)
         {
-            return true;
+            return ApplyOverTheClient(process, wanted);
         }
 
         var target = wanted ? SwitchedOn : SwitchedOff;
@@ -168,6 +177,86 @@ public abstract class ByteToggle : IGameToggle
         _reported = false;
 
         return true;
+    }
+
+    /// <summary>
+    /// The same switch over a value the client decides for itself.
+    /// </summary>
+    /// <remarks>
+    /// Written on the way in and put back on the way out, rather than asserted every pass.
+    /// The client writes this one when the player enters water and leaves it alone
+    /// otherwise, so there is nothing to re-assert against — and asserting the off value
+    /// every pass is exactly what wrote water onto maps that had none.
+    /// </remarks>
+    private bool ApplyOverTheClient(RemoteProcess process, bool wanted)
+    {
+        Span<byte> current = stackalloc byte[SwitchedOn.Length];
+
+        if (!process.TryReadBytes(Address, current))
+        {
+            return Report($"{Name}: {Address} could not be read.");
+        }
+
+        if (!current.SequenceEqual(SwitchedOn) && !current.SequenceEqual(SwitchedOff))
+        {
+            return Report(
+                $"{Name}: {Address} reads {BytePattern.Format(current)}, which is neither of its two states.");
+        }
+
+        _reported = false;
+
+        if (wanted)
+        {
+            // Already what the switch asks for. Either this launcher put it there, or this
+            // is somewhere the value was going to be that anyway — and in the second case
+            // there is nothing to put back later, which is the whole point of not
+            // remembering it.
+            if (current.SequenceEqual(SwitchedOn))
+            {
+                return true;
+            }
+
+            _overwrote = current.ToArray();
+
+            Write(process, SwitchedOn);
+            _logger.LogInformation("{Toggle} switched on over {Was}", Name, BytePattern.Format(current));
+
+            return true;
+        }
+
+        if (_overwrote is null)
+        {
+            // Nothing of ours to undo, and not ours to set.
+            return true;
+        }
+
+        var was = _overwrote;
+
+        _overwrote = null;
+
+        // The client has written something since. Whatever it decided is more current than
+        // what this remembers, so it stands.
+        if (!current.SequenceEqual(SwitchedOn))
+        {
+            return true;
+        }
+
+        Write(process, was);
+        _logger.LogInformation("{Toggle} switched off, putting back {Was}", Name, BytePattern.Format(was));
+
+        return true;
+    }
+
+    private void Write(RemoteProcess process, ReadOnlySpan<byte> bytes)
+    {
+        if (IsCode)
+        {
+            process.WriteCode(Address, bytes);
+        }
+        else
+        {
+            process.WriteBytes(Address, bytes);
+        }
     }
 
     /// <summary>Logs once per spell of trouble rather than once per pass.</summary>

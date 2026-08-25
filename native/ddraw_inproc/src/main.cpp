@@ -18,6 +18,29 @@ static volatile bool g_ready = false;
 typedef void(__cdecl* PFN_Present)(IDirectDrawSurface7*, RECT*, int*);
 static void* g_origPresent = nullptr;   // trampoline(可當原函式呼叫)
 
+// ───────────────────── 遊戲自家 16bpp 軟體縮放器 ─────────────────────
+//  FUN_00558b40 / FUN_0055a8b0(啟動時依 CPU 偵測擇一寫進 slot 0x00bac670)
+//   Scale(dstSurface, dstRect, srcSurface, srcRect, mode) __cdecl
+typedef void(__cdecl* PFN_Scale)(IDirectDrawSurface7*, RECT*, IDirectDrawSurface7*, RECT*, int);
+
+// 目的尺寸只由模式決定(對齊 FUN_0055d460 開頭的 switch);來源永遠是 800x600。
+static void ModeSize(int mode, int* w, int* h)
+{
+    switch (mode) {
+        case 4:  *w = 400;  *h = 300;  break;
+        case 6:  *w = 1200; *h = 900;  break;
+        case 7:  *w = 1600; *h = 1200; break;
+        default: *w = 800;  *h = 600;  break;
+    }
+}
+
+// 原生 present 只有模式 1/3/5/7 直接 Blt 來源 surface(1x / 整數 2x,拉伸無損);
+// 其餘(4 = 0.5x、6 = 1.5x)一律先過遊戲自家縮放器寫進中繼 surface 再 Blt。
+static bool UsesGameScaler(int mode)
+{
+    return !(mode == 1 || mode == 3 || mode == 5 || mode == 7);
+}
+
 // ───────────────────── 遊戲主視窗 HWND ─────────────────────
 static HWND g_gameHwnd = nullptr;
 
@@ -50,6 +73,29 @@ static bool TryPresentSwapchain(IDirectDrawSurface7* src, RECT* srcRect)
     HWND hwnd = GetGameHwnd();
     if (!hwnd) return false;
 
+    // ── 對齊原生 present 的兩條路(FUN_0055d460)────────────────────────────
+    //  模式 4(400x300)/ 6(1200x900)是非整數倍縮放,原生會先呼叫自家 16bpp 縮放器
+    //  把 800x600 來源縮進中繼 surface(0x9a84dc)再 Blt。先前這裡略過那一步,直接
+    //  把 800x600 交給 GDI StretchDIBits + COLORONCOLOR —— 放大時 GDI 只複製列/欄
+    //  (最近鄰),1.5x 下每兩個像素只有一個被複製 → 文字與 dither 整張糊掉。
+    //  照原邏輯先跑縮放器,呈現的就是遊戲自己算好的 1200x900,與客戶端原生一致。
+    int mode = *(volatile int*)gaddr::SCALE_MODE;
+    RECT scaledRect = { 0, 0, 0, 0 };
+    if (UsesGameScaler(mode)) {
+        IDirectDrawSurface7* mid   = *(IDirectDrawSurface7**)gaddr::SCALED_SURFACE;
+        PFN_Scale            scale = *(PFN_Scale*)gaddr::SCALER_FPTR;
+        // 縮放器 / 中繼 surface 尚未就緒,或原函式沒給 srcRect(縮放器會直接解參考)
+        // → 交回原函式,別自己冒險。
+        if (!mid || !scale || !srcRect) return false;
+        int dw = 0, dh = 0;
+        ModeSize(mode, &dw, &dh);
+        scaledRect.right  = dw;
+        scaledRect.bottom = dh;
+        scale(mid, &scaledRect, src, srcRect, mode);
+        src     = mid;
+        srcRect = &scaledRect;
+    }
+
     DDSURFACEDESC2 desc;
     ZeroMemory(&desc, sizeof(desc));
     desc.dwSize = sizeof(desc);
@@ -75,7 +121,8 @@ static bool TryPresentSwapchain(IDirectDrawSurface7* src, RECT* srcRect)
 
     static volatile LONG s_logged = 0;
     if (InterlockedExchange((LONG*)&s_logged, 1) == 0)
-        Log("present[1]: surf=%dx%d pitch=%ld srcRect=(%d,%d,%d,%d) is565=%d",
+        Log("present[1]: mode=%d scaler=%d surf=%dx%d pitch=%ld srcRect=(%d,%d,%d,%d) is565=%d",
+            mode, (int)UsesGameScaler(mode),
             (int)desc.dwWidth, (int)desc.dwHeight, desc.lPitch, sx, sy, sw, sh, (int)is565);
 
     PresentBits16(hwnd, bits, desc.lPitch, sw, sh, is565);

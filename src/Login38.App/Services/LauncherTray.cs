@@ -12,7 +12,7 @@ namespace Login38.App.Services;
 /// An interface so the window can be exercised without one being added to a real
 /// notification area, which a test host does not have.
 /// </remarks>
-public interface ILauncherTray
+public interface ILauncherTray : IDisposable
 {
     /// <summary>Hides the window and puts an icon beside the clock.</summary>
     /// <param name="tooltip">What hovering over the icon says.</param>

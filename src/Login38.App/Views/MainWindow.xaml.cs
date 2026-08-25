@@ -14,10 +14,14 @@ namespace Login38.App.Views;
 /// <remarks>
 /// <para>
 /// It leaves the screen once a game is up. That is what a launcher is expected to do, and
-/// what the reference did by exiting — which is not available here, because the patching
-/// and every helper feature run in this process and poll the client from outside. So it
-/// withdraws to the notification area instead: gone from in front of the game, still there
-/// to come back to.
+/// what the reference did by exiting — which is not available at that moment here, because
+/// the patching and every helper feature run in this process and poll the client from
+/// outside. So it withdraws to the notification area instead: gone from in front of the
+/// game, still there to come back to.
+/// </para>
+/// <para>
+/// When the game ends it does exit, which is the same thing one step later. Nothing here
+/// outlives the client it was started for.
 /// </para>
 /// <para>
 /// The close button does the same thing while a game is running rather than ending the
@@ -28,24 +32,28 @@ namespace Login38.App.Views;
 public partial class MainWindow : FluentWindow, IDisposable
 {
     private readonly MainViewModel _model;
-    private readonly LauncherTray? _tray;
+    private readonly ILauncherTray? _tray;
 
     /// <param name="model">What the window shows.</param>
     /// <param name="loggers">
     /// Where the notification area reports to. Null leaves the launcher on screen — which
     /// is what the layout tests want, having no notification area to withdraw into.
     /// </param>
-    public MainWindow(MainViewModel model, ILoggerFactory? loggers = null)
+    /// <param name="tray">
+    /// A notification area to use instead of the real one. For the tests that drive what
+    /// this window does when a game starts and ends, which is the one part of it that puts
+    /// an icon beside somebody's clock and takes the launcher off their screen.
+    /// </param>
+    public MainWindow(MainViewModel model, ILoggerFactory? loggers = null, ILauncherTray? tray = null)
     {
         _model = model;
         DataContext = model;
 
         InitializeComponent();
 
-        if (loggers is not null)
-        {
-            _tray = new LauncherTray(this, loggers.CreateLogger<LauncherTray>());
-        }
+        _tray = tray ?? (loggers is null
+            ? null
+            : new LauncherTray(this, loggers.CreateLogger<LauncherTray>()));
 
         model.PropertyChanged += OnModelChanged;
     }
@@ -117,12 +125,21 @@ public partial class MainWindow : FluentWindow, IDisposable
         if (_model.IsGameRunning)
         {
             _tray.Withdraw(_model.TrayCaption);
+
+            return;
         }
-        else if (_tray.IsWithdrawn)
-        {
-            // The game ended. Coming back is what the player expects — the alternative is
-            // an icon beside the clock and no sign that anything happened.
-            _tray.Restore();
-        }
+
+        // The game ended, and with it the only reason this process was still here. The
+        // patches are applied or missed, the helper has stopped, and there is nothing left
+        // to poll — so the launcher goes too, rather than putting a window back over
+        // whatever the player turned to.
+        //
+        // It came back once, and that was worse than it sounds: a window appearing and
+        // taking the foreground at the exact moment the client is giving up its display
+        // mode is a visible stutter on the way out of the game.
+        //
+        // Closing is how this is said. Ending the session is the application's decision,
+        // and the application is listening for this window to close.
+        Close();
     }
 }

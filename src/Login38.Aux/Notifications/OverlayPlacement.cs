@@ -1,4 +1,4 @@
-using Login38.Interop;
+﻿using Login38.Interop;
 
 namespace Login38.Aux.Notifications;
 
@@ -24,12 +24,25 @@ public static class OverlayPlacement
     /// <summary>
     /// Where to put the overlay, or null for "nowhere".
     /// </summary>
+    /// <param name="window">What the game's window is currently doing.</param>
+    /// <param name="anythingToShow">Whether there is a toast or a number waiting to be drawn.</param>
     /// <remarks>
+    /// <para>
     /// A minimised window still has a client rectangle, and it is somewhere off the bottom
     /// of the desktop — so "is it minimised" has to be asked separately rather than inferred
     /// from where the game says it is.
+    /// </para>
+    /// <para>
+    /// Nothing to show is also nowhere. This started as a window kept over the client's
+    /// picture for the whole session, drawing nothing most of it: a layered, always-on-top
+    /// window redrawn ten times a second, over the login screen, over character select and
+    /// over the client's own farewell screen. A toast lasts a few seconds. The rest of the
+    /// time the client should have its picture to itself, and the launcher should have no
+    /// window on it at all.
+    /// </para>
     /// </remarks>
-    public static ScreenArea? Where(WindowState window) =>
+    public static ScreenArea? Where(WindowState window, bool anythingToShow) =>
+        anythingToShow &&
         window is { Visible: true, Minimised: false, Foreground: true, Client: { IsEmpty: false } client }
             ? client
             : null;

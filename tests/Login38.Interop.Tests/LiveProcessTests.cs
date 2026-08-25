@@ -221,6 +221,78 @@ public sealed partial class LiveProcessTests
         }
     }
 
+    // ------------------------------------------------------ waiting for an exit
+
+    // The one transition a player is looking straight at. The first version of this polled
+    // every 250 ms, so the launcher spent up to a quarter of a second after the game had
+    // gone still believing it was there.
+    [Fact]
+    public async Task NoticesAnExitWithoutWaitingForAPoll()
+    {
+        using var child = System.Diagnostics.Process.Start(
+            new System.Diagnostics.ProcessStartInfo("cmd.exe", "/c pause")
+            { CreateNoWindow = true, UseShellExecute = false, RedirectStandardInput = true })!;
+
+        using var process = RemoteProcess.Open((uint)child.Id);
+
+        var waiting = process.WaitForExitAsync();
+
+        waiting.IsCompleted.ShouldBeFalse("it returned before the process had gone anywhere");
+
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        child.Kill();
+
+        await waiting.WaitAsync(TimeSpan.FromSeconds(5));
+
+        // A wait returns in single-digit milliseconds. This is loose enough not to fail on a
+        // busy machine and tight enough that a quarter-second poll would usually miss it,
+        // which is the regression it is here for.
+        started.Elapsed.ShouldBeLessThan(
+            TimeSpan.FromMilliseconds(100),
+            $"it took {started.ElapsedMilliseconds} ms to notice, which is a poll rather than a wait");
+    }
+
+    [Fact]
+    public async Task ReturnsAtOnceForAProcessThatHasAlreadyGone()
+    {
+        using var child = System.Diagnostics.Process.Start(
+            new System.Diagnostics.ProcessStartInfo("cmd.exe", "/c exit")
+            { CreateNoWindow = true, UseShellExecute = false })!;
+
+        using var process = RemoteProcess.Open((uint)child.Id);
+        await child.WaitForExitAsync();
+
+        await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));
+    }
+
+    // The launcher closing while a game is still up. Nothing is killed -- the player did
+    // not ask for that -- so the wait has to be the thing that ends.
+    [Fact]
+    public async Task StopsWaitingWhenTheLauncherIsClosing()
+    {
+        using var child = System.Diagnostics.Process.Start(
+            new System.Diagnostics.ProcessStartInfo("cmd.exe", "/c pause")
+            { CreateNoWindow = true, UseShellExecute = false, RedirectStandardInput = true })!;
+
+        try
+        {
+            using var process = RemoteProcess.Open((uint)child.Id);
+            using var closing = new CancellationTokenSource();
+
+            var waiting = process.WaitForExitAsync(closing.Token);
+            await closing.CancelAsync();
+
+            await Should.ThrowAsync<OperationCanceledException>(
+                waiting.WaitAsync(TimeSpan.FromSeconds(5)));
+
+            child.HasExited.ShouldBeFalse("the game was killed rather than left alone");
+        }
+        finally
+        {
+            child.Kill();
+        }
+    }
+
     [Fact]
     public void LaunchingAMissingExecutableThrows() =>
         Should.Throw<GameProcessException>(() => GameProcessLauncher.Launch(

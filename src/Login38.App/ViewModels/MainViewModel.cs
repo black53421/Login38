@@ -25,6 +25,16 @@ namespace Login38.App.ViewModels;
 /// JSON both ways. Here it is ordinary bindable state, so the same behaviour is
 /// exercisable without a window.
 /// </para>
+/// <para>
+/// <b>Nothing here awaits with <c>ConfigureAwait(false)</c>, deliberately.</b> Every line
+/// after an await sets state a window is bound to, and the window will not be touched from
+/// anywhere but the thread it was made on. Two of the ways that goes wrong are not obvious:
+/// a command's <c>CanExecuteChanged</c> reaches a button synchronously, and a plain
+/// <c>PropertyChanged</c> subscriber — which the launcher window is — runs on whichever
+/// thread raised it. Neither is marshalled for us the way an ordinary binding is. So the
+/// continuations stay on the thread the command was invoked from, which for every command
+/// here is the interface thread.
+/// </para>
 /// </remarks>
 public sealed partial class MainViewModel : ObservableObject
 {
@@ -143,7 +153,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         Status = Servers.Count == 0 ? "目前沒有開放的伺服器。" : string.Empty;
 
-        await RefreshAvailabilityAsync(cancellationToken).ConfigureAwait(false);
+        await RefreshAvailabilityAsync(cancellationToken);
     }
 
     /// <summary>Checks every offered server, all at once.</summary>
@@ -156,12 +166,12 @@ public sealed partial class MainViewModel : ObservableObject
     {
         var checks = Servers.Select(async entry =>
         {
-            var online = await _probe.IsReachableAsync(entry.Server, cancellationToken).ConfigureAwait(false);
+            var online = await _probe.IsReachableAsync(entry.Server, cancellationToken);
 
             entry.Availability = online ? ServerAvailability.Online : ServerAvailability.Offline;
         });
 
-        await Task.WhenAll(checks).ConfigureAwait(false);
+        await Task.WhenAll(checks);
     }
 
     /// <summary>Whether the launcher is in a state where starting a game makes sense.</summary>
@@ -208,7 +218,7 @@ public sealed partial class MainViewModel : ObservableObject
             IsBusy = false;
             Status = "正在啟動遊戲…";
 
-            await TrackAsync(session).ConfigureAwait(false);
+            await TrackAsync(session);
         }
         catch (Exception e) when (e is FileNotFoundException or IOException
                                   or UnauthorizedAccessException or InvalidDataException)
@@ -230,17 +240,16 @@ public sealed partial class MainViewModel : ObservableObject
         // Said as soon as there is a client to look at. What follows takes as long as the
         // client's own unpacking does — half a minute is ordinary — and a single unchanging
         // line for all of it is what "stuck" looks like.
-        if (await Task.WhenAny(session.Unpacked, session.Completion).ConfigureAwait(false)
-            == session.Unpacked)
+        if (await Task.WhenAny(session.Unpacked, session.Completion) == session.Unpacked)
         {
             Status = "遊戲執行中。剩下的修補進行中…";
         }
 
-        var finished = await Task.WhenAny(patching, session.Completion).ConfigureAwait(false);
+        var finished = await Task.WhenAny(patching, session.Completion);
 
         if (finished == patching)
         {
-            var outcomes = await patching.ConfigureAwait(false);
+            var outcomes = await patching;
             var failed = outcomes.Count(o => o.Status == PatchStatus.Failed);
 
             // Failures are not fatal by design — each one costs a feature, not the game —
@@ -250,13 +259,21 @@ public sealed partial class MainViewModel : ObservableObject
                 : $"遊戲執行中。{outcomes.Count} 項修補中有 {failed} 項沒有套用成功。";
         }
 
-        await session.Completion.ConfigureAwait(false);
+        await session.Completion;
 
         session.Helper.Keys.WindowRequested -= OnSettingsAskedFor;
 
-        IsGameRunning = false;
-        Status = string.Empty;
+        // Stopped here rather than left for the end of the process. The helper's loop is
+        // still ticking over a client that has gone, the relay is still holding its port,
+        // and the character's settings are written when the scope holding them closes.
+        await session.DisposeAsync();
+
         _session = null;
+        Status = string.Empty;
+
+        // Last, because this is what ends the launcher: with the game gone there is nothing
+        // left for this process to do, and it says so through the window.
+        IsGameRunning = false;
     }
 
     /// <summary>The player pressed Home in the game.</summary>

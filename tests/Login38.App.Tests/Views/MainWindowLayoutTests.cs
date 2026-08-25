@@ -72,6 +72,77 @@ public sealed class MainWindowLayoutTests : IDisposable
         NullLogger<MainViewModel>.Instance,
         _preferences);
 
+    /// <summary>A notification area that records rather than one beside somebody's clock.</summary>
+    private sealed class Recorded : ILauncherTray
+    {
+        public string? Tooltip { get; private set; }
+
+        public bool IsWithdrawn { get; private set; }
+
+        public int Restores { get; private set; }
+
+        public void Withdraw(string tooltip)
+        {
+            Tooltip = tooltip;
+            IsWithdrawn = true;
+        }
+
+        public void Restore()
+        {
+            Restores++;
+            IsWithdrawn = false;
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    // What a launcher is expected to do once the game it started is on screen.
+    [Fact]
+    public void WithdrawsToTheNotificationAreaWhenTheGameStarts()
+    {
+        var model = Model();
+        var tray = new Recorded();
+
+        var withdrawn = WindowLayout.Shown(
+            () => new MainWindow(model, tray: tray),
+            _ =>
+            {
+                model.IsGameRunning = true;
+
+                return tray.IsWithdrawn;
+            });
+
+        withdrawn.ShouldBeTrue();
+    }
+
+    // And what it does when that game ends: goes, rather than putting itself back over
+    // whatever the player turned to. A window appearing and taking the foreground at the
+    // moment the client is giving up its display mode is a stutter on the way out.
+    [Fact]
+    public void EndsWithTheGameRatherThanComingBack()
+    {
+        var model = Model();
+        var tray = new Recorded();
+
+        var (closed, restores) = WindowLayout.Shown(
+            () => new MainWindow(model, tray: tray),
+            window =>
+            {
+                var ended = false;
+                window.Closed += (_, _) => ended = true;
+
+                model.IsGameRunning = true;
+                model.IsGameRunning = false;
+
+                return (ended, tray.Restores);
+            });
+
+        closed.ShouldBeTrue("the launcher stayed open after the game it was started for ended");
+        restores.ShouldBe(0, "it put its window back instead of ending");
+    }
+
     // The markup is read in the constructor, so building it is the whole test.
     [Fact]
     public void CanBeBuiltAndShown()

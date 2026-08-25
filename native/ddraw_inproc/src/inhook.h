@@ -20,6 +20,9 @@ namespace gaddr {
     constexpr uintptr_t FULLSCREEN_FLAG = 0x009a84d0; // byte:0=視窗(DDSCL_NORMAL),非0=全螢幕
     constexpr uintptr_t PF_SELECTOR     = 0x009a235c; // int:0=RGB555,1=RGB565
     constexpr uintptr_t PRIMARY_SURFACE = 0x009a84e8; // IDirectDrawSurface7* primary
+    constexpr uintptr_t SCALE_MODE      = 0x00963e54; // int:縮放模式 4=400x300 5=800x600 6=1200x900 7=1600x1200
+    constexpr uintptr_t SCALED_SURFACE  = 0x009a84dc; // IDirectDrawSurface7* 縮放中繼 surface(模式 4/6 用)
+    constexpr uintptr_t SCALER_FPTR     = 0x00bac670; // 函式指標 slot:遊戲自家 16bpp 軟體縮放器
 }
 
 // ───────────────────────── present.cpp ─────────────────────────

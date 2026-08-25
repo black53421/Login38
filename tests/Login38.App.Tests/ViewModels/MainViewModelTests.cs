@@ -1,9 +1,11 @@
+using System.Collections.Concurrent;
 using System.IO;
 using Login38.App.Services;
 using Login38.App.ViewModels;
 using Login38.Core.Configuration;
 using Login38.Core.Servers;
 using Login38.Core.Text;
+using Login38.TestSupport;
 using Login38.Tests;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -169,5 +171,145 @@ public sealed class MainViewModelTests : IDisposable
             .ToArray();
 
         offered.ShouldBeEmpty(string.Join(", ", offered));
+    }
+
+    // ------------------------------------------ the thread the changes are raised on
+
+    // The launcher window subscribes to this view model's PropertyChanged directly and
+    // touches windows from it, and a command's CanExecuteChanged reaches a button the same
+    // way. Neither is marshalled the way an ordinary binding is, so a change raised on a
+    // pool thread is an error dialog in the player's face. That is what a ConfigureAwait
+    // (false) in here bought, every time a game exited.
+    [ShippingPackageFact]
+    public void RaisesEveryChangeOnTheThreadItsCommandsWereCalledFrom()
+    {
+        var wrong = new ConcurrentBag<int>();
+        var expected = 0;
+        var raised = 0;
+
+        Pump.Run(async () =>
+        {
+            expected = Environment.CurrentManagedThreadId;
+
+            var model = Build(new SlowProbe());
+
+            model.PropertyChanged += (_, _) => Seen();
+            model.Servers.CollectionChanged += (_, e) =>
+            {
+                Seen();
+
+                foreach (var added in e.NewItems?.OfType<ServerEntryViewModel>() ?? [])
+                {
+                    added.PropertyChanged += (_, _) => Seen();
+                }
+            };
+
+            await model.LoadAsync();
+
+            void Seen()
+            {
+                Interlocked.Increment(ref raised);
+
+                if (Environment.CurrentManagedThreadId != expected)
+                {
+                    wrong.Add(Environment.CurrentManagedThreadId);
+                }
+            }
+        });
+
+        raised.ShouldBeGreaterThan(0);
+        wrong.ShouldBeEmpty($"{wrong.Count} of {raised} changes were raised off the interface thread");
+    }
+
+    // And the same rule where the test above cannot reach: the tail of a launch only runs
+    // when a real client exits, which is exactly where the dialog came from.
+    [Fact]
+    public void NeverHandsAContinuationToAnotherThreadInAViewModel()
+    {
+        var offenders = Directory
+            .EnumerateDirectories(Path.Combine(Checkout.Root, "src"), "ViewModels", SearchOption.AllDirectories)
+            .SelectMany(folder => Directory.EnumerateFiles(folder, "*.cs", SearchOption.AllDirectories))
+            .Where(file => !Checkout.IsBuildOutput(file))
+            .SelectMany(file => File.ReadLines(file)
+                .Select((text, index) => (Name: Path.GetFileName(file), Line: index + 1, Text: text)))
+            .Where(line => line.Text.Contains("ConfigureAwait(false)", StringComparison.Ordinal))
+            // The rule itself is written down in a comment, which is not a place it
+            // can be broken.
+            .Where(line => !line.Text.TrimStart().StartsWith("//", StringComparison.Ordinal))
+            .Select(line => $"{line.Name}:{line.Line}")
+            .ToArray();
+
+        offenders.ShouldBeEmpty(
+            $"a view model stepped off the interface thread at {string.Join(", ", offenders)}");
+    }
+
+    /// <summary>A probe that finishes somewhere else, the way a real socket does.</summary>
+    private sealed class SlowProbe : IServerProbe
+    {
+        public async Task<bool> IsReachableAsync(ServerInfo server, CancellationToken cancellationToken = default)
+        {
+            // Long enough to be a real continuation rather than a synchronous return, which
+            // is what puts the rest of the caller on whichever thread the timer fired on.
+            await Task.Delay(10, cancellationToken);
+
+            return true;
+        }
+    }
+
+    /// <summary>Runs asynchronous work with one thread behind it, the way a window does.</summary>
+    /// <remarks>
+    /// A test host has no synchronization context, so every continuation lands on a pool
+    /// thread and a view model that steps off the interface thread looks exactly like one
+    /// that stays on it. This puts one in place: everything posted to it runs on the thread
+    /// that called <see cref="Run"/>, and nothing else does.
+    /// </remarks>
+    private sealed class Pump : SynchronizationContext, IDisposable
+    {
+        private readonly BlockingCollection<(SendOrPostCallback Work, object? State)> _queue = new();
+
+        public static void Run(Func<Task> work)
+        {
+            var previous = Current;
+            using var pump = new Pump();
+
+            SetSynchronizationContext(pump);
+
+            try
+            {
+                var task = work();
+
+                // Off the pump's own thread, or the signal to stop would be queued behind
+                // the work it is the signal for.
+                _ = task.ContinueWith(_ => pump._queue.CompleteAdding(), TaskScheduler.Default);
+
+                foreach (var (callback, state) in pump._queue.GetConsumingEnumerable())
+                {
+                    callback(state);
+                }
+
+                task.GetAwaiter().GetResult();
+            }
+            finally
+            {
+                SetSynchronizationContext(previous);
+            }
+        }
+
+        public override void Post(SendOrPostCallback d, object? state)
+        {
+            try
+            {
+                _queue.Add((d, state));
+            }
+            catch (Exception e) when (e is InvalidOperationException or ObjectDisposedException)
+            {
+                // The work finished while this was on its way, so there is nothing left
+                // running to run it on.
+            }
+        }
+
+        public override void Send(SendOrPostCallback d, object? state) => d?.Invoke(state);
+
+        public void Dispose() => _queue.Dispose();
     }
 }

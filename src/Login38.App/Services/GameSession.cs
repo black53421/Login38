@@ -52,6 +52,8 @@ public sealed class GameSession : IAsyncDisposable
     private readonly CancellationTokenSource _cancellation;
     private readonly ILogger _logger;
 
+    private bool _disposed;
+
     /// <summary>
     /// Completes once the startup patches have been attempted, which is when the client's
     /// own code has been decrypted and is worth looking at.
@@ -235,8 +237,21 @@ public sealed class GameSession : IAsyncDisposable
         }
     }
 
+    /// <summary>Stops everything this game had running and hands its resources back.</summary>
+    /// <remarks>
+    /// Guarded, because there are two owners with a claim on calling it: the launcher, once
+    /// the game has exited and there is nothing left to help, and whatever tears down at the
+    /// end of the process.
+    /// </remarks>
     public async ValueTask DisposeAsync()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
         await _cancellation.CancelAsync().ConfigureAwait(false);
 
         // All three are guarded against cancellation internally, so none will throw here.

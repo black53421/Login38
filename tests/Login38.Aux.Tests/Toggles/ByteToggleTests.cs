@@ -116,14 +116,49 @@ public sealed class ByteToggleTests : IDisposable
         Read().ShouldBe(Off);
     }
 
-    // Some of what these switch is a value the client keeps up to date itself, and it has
-    // no original to put back. The sea-water flag reads 0 on a map with no sea in it, and
-    // writing the "off" value over that told dry ground to draw water — twice a second,
-    // for as long as the switch was off, which is to say for almost the whole game.
+    // Some of what these switch is a value the client decides for itself, and it has no
+    // fixed original to put back: what belongs there depends on where the character is
+    // standing. Switching one off puts back what was actually found, and only if this
+    // launcher was what changed it.
     [Fact]
-    public void WritesNothingAtAllWhenSwitchedOffIfTheClientOwnsTheValue()
+    public void PutsBackWhatItFoundWhenTheClientOwnsTheValue()
+    {
+        var toggle = new ClientOwnedToggle(_page.Address);
+
+        Write(Off);
+
+        toggle.Apply(_process, wanted: true).ShouldBeTrue();
+        Read().ShouldBe(On);
+
+        toggle.Apply(_process, wanted: false).ShouldBeTrue();
+        Read().ShouldBe(Off);
+    }
+
+    // And writes nothing where it changed nothing. The sea-water flag reads 0 on a map
+    // with no sea in it, and writing the off value over that told dry ground to draw
+    // water — twice a second, for as long as the switch was off.
+    [Fact]
+    public void WritesNothingWhenSwitchingOffSomethingItNeverChanged()
     {
         byte[] whateverTheMapCallsFor = On;
+
+        Write(whateverTheMapCallsFor);
+
+        var toggle = new ClientOwnedToggle(_page.Address);
+
+        // On, and there was nothing to do: it was already what the switch asks for.
+        toggle.Apply(_process, wanted: true).ShouldBeTrue();
+
+        toggle.Apply(_process, wanted: false).ShouldBeTrue();
+
+        Read().ShouldBe(whateverTheMapCallsFor);
+    }
+
+    [Fact]
+    public void WritesNothingWhenSwitchedOffWithoutEverHavingBeenOn()
+    {
+        byte[] whateverTheMapCallsFor = On;
+
         Write(whateverTheMapCallsFor);
 
         new ClientOwnedToggle(_page.Address).Apply(_process, wanted: false).ShouldBeTrue();
@@ -131,20 +166,42 @@ public sealed class ByteToggleTests : IDisposable
         Read().ShouldBe(whateverTheMapCallsFor);
     }
 
-    // Including after this launcher has switched it on, because there is no rule for what
-    // to put back: it cannot tell whether this map's own value is the one it overwrote or
-    // the other one. The client sets the flag again next time the player touches water.
+    // Once, on the way in — not every pass. The client writes this one when the player
+    // enters water and leaves it alone otherwise, so there is nothing to assert against,
+    // and asserting is what caused the trouble in the first place.
     [Fact]
-    public void StillWritesNothingAfterItHadSwitchedItOn()
+    public void PutsBackOnlyOnceWhenTheClientOwnsTheValue()
     {
         var toggle = new ClientOwnedToggle(_page.Address);
-        Write(Off);
 
-        toggle.Apply(_process, wanted: true).ShouldBeTrue();
-        Read().ShouldBe(On);
+        Write(Off);
+        toggle.Apply(_process, wanted: true);
 
         toggle.Apply(_process, wanted: false).ShouldBeTrue();
+        Read().ShouldBe(Off);
+
+        // The client's again from here. A second pass must not write over whatever it has
+        // decided since.
+        Write(On);
+        toggle.Apply(_process, wanted: false).ShouldBeTrue();
         Read().ShouldBe(On);
+    }
+
+    // What the client decided since is more current than what this remembers.
+    [Fact]
+    public void LeavesItAloneWhenTheClientHasWrittenSince()
+    {
+        var toggle = new ClientOwnedToggle(_page.Address);
+
+        Write(Off);
+        toggle.Apply(_process, wanted: true);
+
+        byte[] theClientsOwn = [0x11, 0x22, 0x33, 0x44, 0x55, 0x66];
+
+        Write(theClientsOwn);
+        toggle.Apply(_process, wanted: false);
+
+        Read().ShouldBe(theClientsOwn);
     }
 
     // Switching one on is unchanged: that is the half the player asked for.

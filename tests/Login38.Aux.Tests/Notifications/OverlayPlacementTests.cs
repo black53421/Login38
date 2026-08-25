@@ -13,25 +13,25 @@ public sealed class OverlayPlacementTests
 
     [Fact]
     public void DrawsOverAGameThePlayerIsLookingAt() =>
-        OverlayPlacement.Where(State()).ShouldBe(Picture);
+        Where(State()).ShouldBe(Picture);
 
     // A toast left hanging over the desktop is worse than no toast.
     [Fact]
     public void DrawsNothingOverAGameThatHasBeenPutAway() =>
-        OverlayPlacement.Where(State() with { Minimised = true }).ShouldBeNull();
+        Where(State() with { Minimised = true }).ShouldBeNull();
 
     // Nor over whatever the player alt-tabbed to.
     [Fact]
     public void DrawsNothingWhileThePlayerIsUsingSomethingElse() =>
-        OverlayPlacement.Where(State() with { Foreground = false }).ShouldBeNull();
+        Where(State() with { Foreground = false }).ShouldBeNull();
 
     [Fact]
     public void DrawsNothingOverAWindowThatIsNotOnScreen() =>
-        OverlayPlacement.Where(State() with { Visible = false }).ShouldBeNull();
+        Where(State() with { Visible = false }).ShouldBeNull();
 
     [Fact]
     public void DrawsNothingWhereTheGameWouldNotSayWhereItIs() =>
-        OverlayPlacement.Where(State() with { Client = null }).ShouldBeNull();
+        Where(State() with { Client = null }).ShouldBeNull();
 
     // A window part way through being created reports a client area of nothing, and
     // stretching a picture over it divides by zero somewhere further down.
@@ -40,8 +40,24 @@ public sealed class OverlayPlacementTests
     [InlineData(1024, 0)]
     [InlineData(-1, -1)]
     public void DrawsNothingOverAPictureWithNoArea(int width, int height) =>
-        OverlayPlacement.Where(State() with { Client = new ScreenArea(0, 0, width, height) })
+        Where(State() with { Client = new ScreenArea(0, 0, width, height) })
             .ShouldBeNull();
+
+    // A toast is waiting in all of these; what they are about is the window.
+    private static ScreenArea? Where(OverlayPlacement.WindowState window) =>
+        OverlayPlacement.Where(window, anythingToShow: true);
+
+    // The launcher had a layered, always-on-top window over the client's picture for the
+    // whole session, redrawn ten times a second, showing nothing at all most of it -- over
+    // the login screen, over character select, and over the client's own farewell screen
+    // while it was giving its display back. A toast lasts a few seconds.
+    [Fact]
+    public void DrawsNothingWhenThereIsNothingToShow() =>
+        OverlayPlacement.Where(State(), anythingToShow: false).ShouldBeNull();
+
+    [Fact]
+    public void DrawsWhenThereIsSomethingToShow() =>
+        OverlayPlacement.Where(State(), anythingToShow: true).ShouldBe(Picture);
 
     private static OverlayPlacement.WindowState State() =>
         new(Visible: true, Minimised: false, Foreground: true, Picture);
