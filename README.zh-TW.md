@@ -28,6 +28,94 @@ dotnet build Login38.slnx -c Debug
 pwsh -File build/publish.ps1 -Zip
 ```
 
+## 功能
+
+### 登入器
+
+- 讀伺服器主加密過的 `list.txt`,只列出真的有在用的欄位,並逐一探測連線,伺服器掛了會在玩家按下
+  開始之前就顯示為離線。
+- 玩家自己的顯示偏好存在 `launcher.ini`,跟伺服器主的 `config.ini` 分開,所以發新的設定檔
+  不會蓋掉別人的設定。
+- 公告頁與伺服器主的連結;可選的伺服器清單自動更新與登入器自我更新,網址由伺服器主指定。
+- 可同時開多開,上限由伺服器主決定(0 = 不限)。
+- 可選的封包加密:伺服器送來的 RSA challenge 折成一個位元組,客戶端把送出去的每個位元組跟它
+  XOR;伺服器主想讓移動封包保持明文的話可以單獨排除。
+- 在登入畫面攔下輸入的帳號密碼,用伺服器模擬器認得的格式送出登入封包。
+- 把客戶端所有對外連線導向選定的伺服器,原版客戶端因此連得到私服。
+
+### 在記憶體裡對客戶端做的修補
+
+每一項都是 `src/Login38.Patching/Patches/` 底下獨立的 `IGamePatch`,依客戶端解包與啟動的
+階段套用。
+
+| 修補 | 做什麼 |
+| --- | --- |
+| `HitPointExpansionPatch` | 把 HP/MP 從 16 位元欄位擴成 32 位元,客戶端碰到的每一處都改 |
+| `ArmourResistanceExpansionPatch` | 把 AC 與魔防從一個位元組擴成完整整數 |
+| `InventoryLimitPatch` | 修正背包視窗顯示的物品數量上限 |
+| `EquipmentSlotsPatch` | 裝備視窗從 19 格擴到 25 格 |
+| `ImageLimitPatch` | 提高客戶端能載入的 `img` 圖素資源數量上限 |
+| `PngLimitPatch` | 擴大客戶端固定大小的 PNG surface 池 |
+| `ItemDescriptionLengthPatch` | 讓過長的物品說明不再讓客戶端當掉 |
+| `ItemDescriptionColourPatch` | 讓物品說明裡的顏色碼生效 |
+| `LongItemStatusPatch` | 教客戶端一種能帶超過 255 位元組物品說明的封包 |
+| `ChatWidthPatch` | 讓聊天行用滿整個聊天框寬度 |
+| `InputBoxBackgroundPatch` | 讓聊天輸入框從畫面上取背景,視窗模式下不再畫成一塊黑 |
+| `PresentHookPatch` | 接管客戶端把畫面送上螢幕的流程,讓輔助自己畫的文字不會被蓋掉 |
+| `SurfacePixelFormatPatch` | 固定 surface 的色彩排列,不再跟著 blitter 執行期的選擇跑 |
+| `SmoothRunPatch` | 加速狀態下的角色是用跑的,不是抖著走 |
+| `SimplifiedChineseTextPatch` | 讓客戶端能顯示簡體中文,給出簡體版的伺服器主用 |
+| `DynamicDialogPatch` | 讓伺服器直接送 NPC 對話內容,而不是只送一個對話編號 |
+| `DynamicIconPatch` | 用自訂 PNG pak 讓指定的物品圖示會動 |
+| `MorphTablePatch` | 從記憶體餵變身表給客戶端,不走磁碟 |
+| `ConnectRedirectPatch` | 把所有對外 TCP 連線導到選定的伺服器 |
+| `LoginHookPatch` | 攔帳號密碼,送出模擬器格式的登入封包 |
+| `MovePacketEncryptionPatch` | 讓客戶端不要混淆與加密移動封包 |
+| `AntiCheatBypassPatch` | 讓客戶端不要因為自己的記憶體完整性檢查而自殺 |
+| `TimeProtectionBypassPatch` | 在殼解完之後解除客戶端的自我保護檢查 |
+| `CrtWatsonPatch` | 讓 VC++ 2008 執行階段不要因為一個無效參數就終止客戶端 |
+| `WindowTitlePatch` | 每次啟動給遊戲視窗一個不同的標題 |
+
+### 遊戲內輔助
+
+**沒按 HOME 就不會啟動** —— 開客戶端不等於要開輔助,有人只是登進去看個東西,或是在玩一隻
+不想讓它自己喝水的角色。之後用 **INSERT** 開關。一個客戶端一份,開兩個客戶端就有兩份。
+
+- **喝水** —— 血量低就喝,物品清單由伺服器主放在 `linhelperZ.ini` 裡。
+- **補 buff** —— 把角色的 buff 維持著。
+- **快捷鍵** —— F1 到 F4 各綁一個指令。
+- **計時器** —— 每隔一段時間執行一個指令。
+- **喊話** —— 把玩家設定的訊息循環喊出去。
+- **丟棄/銷毀** —— 處理玩家標記的物品。
+- **角色設定檔** —— 角色進入世界時載入它的設定,離開時存回去。
+- **通知** —— 左下角的拾取提示,以及每次擊殺浮出的經驗值與金錢文字。
+- **背包監看** —— 輔助視窗開著的時候持續更新背包內容。
+- **封包側錄** —— 把客戶端送出的每個封包寫進 log。
+
+輔助視窗裡玩家可以自己開關的項目:
+
+| 開關 | 做什麼 |
+| --- | --- |
+| 永晝 | 世界維持在正午的亮度 |
+| 傷害顯示 | 顯示每次打中的傷害,在目標上方或下方 |
+| 怪物顏色 | 依怪物比玩家高多少來上色牠的名字 |
+| 時鐘 | 把遊戲內時鐘留在畫面上 |
+| 低 CPU | 讓客戶端閒置,不要空轉一顆核心 |
+| 水中 | 玩家在水下時把水的效果從畫面上拿掉 |
+
+### 編碼器
+
+- 編輯伺服器清單 —— 名稱、位址、連接埠,以及每台伺服器各自的功能開關 —— 寫回成加密的
+  `list.txt`,原版客戶端也讀得懂的格式。
+- 把 `[aux]` 與 `[launcher]` 開關寫進 `config.ini`,RSA 金鑰對寫進給伺服器端用的
+  `pack.properties`。
+- 把變身表從 `.txt` 打包成 `.pak`,並加上標記,讓登入器拒絕第三方工具產生的 `.pak`。
+
+### 尚未實作
+
+有兩個開關會被解析並原樣寫回,好讓伺服器主的設定檔 round-trip 不掉東西,但目前沒有任何程式碼
+會讀它們:`AntiCheatAdvanced` 與 `InternalBotEnabled`。
+
 ## x86 是正確性要求,不是偏好
 
 注入器會在自己這個行程裡解析 `LoadLibraryW`,再把那個位址交給 32 位元遊戲行程的

@@ -33,7 +33,7 @@ development** workload opens `Login38.slnx` directly.
 ## 2. Clone and build
 
 ```powershell
-git clone https://github.com/<owner>/Login38.git
+git clone https://github.com/r0ptik/Login38.git
 cd Login38
 dotnet build Login38.slnx -c Debug
 ```
@@ -56,6 +56,24 @@ Or run the project sensor, which does both and exits non-zero on any failure:
 ```bash
 .claude/check.sh          # git-bash / WSL
 ```
+
+### Ten tests report as skipped, and that is correct
+
+`ShippingFileCompatibilityTests` and half of `MainViewModelTests` read a real shipping
+package — one operator's `list.txt` and `config.ini`. Those two files are a live server's
+configuration: its address, and the RSA triple the client decrypts the packet-encryption
+challenge with. The cipher key is a constant in this repository, so anyone with a clone
+can read them; they are not in git.
+
+A fresh clone therefore has an empty `TestData` directory and those ten tests skip. They
+are not replaced by a generated fixture on purpose — what they prove is that this code
+reads the bytes the previous Rust build already put in players' hands, and a file this
+code wrote itself only proves it agrees with itself.
+
+To run them, drop your own `list.txt` and `config.ini` into
+`tests/Login38.Core.Tests/TestData/` and `tests/Login38.App.Tests/TestData/`. They are
+copied to the output directory on build, and `.gitignore` already keeps them out of
+commits.
 
 ## 4. Produce the shipping executables
 
@@ -158,6 +176,7 @@ src/
   Login38.App/               launcher.exe — WPF Fluent shell (WPF-UI + MVVM)
   Login38.Encoder/           encoder.exe — server-operator tool
 tests/                       xUnit test projects, one per source project
+  Shared/                    test helpers linked into more than one project
 build/                       app manifests, publish script, end-user readme
 assets/                      icons and logos, compiled into the executables
 native/ddraw_inproc/         C++ DirectDraw present hook, embedded as a resource

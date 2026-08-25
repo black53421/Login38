@@ -4,30 +4,41 @@ obj/
 artifacts/
 *.user
 .vs/
+*_debug.log
 native/ddraw_inproc/build/*.obj
 
 # --- Never publish -------------------------------------------------------------
+# Every pattern below is anchored with a leading slash so it matches the repository
+# root and nothing else. An unanchored `runtime/` also matches src/Login38.Aux/Runtime/,
+# which silently drops twenty source files and leaves a clone that cannot build — git on
+# Windows folds case, so the capital R is no protection. Anchor these.
+
 # An operator's generated package. pack.properties holds the RSA private exponent;
-# list.txt and config.ini are that server's encrypted settings. A player gets these
-# from their own server, never from this repository.
-dist/
-pack.properties
-list.txt
-config.ini
-launcher.ini
-*_debug.log
+# list.txt and config.ini are that server's encrypted settings, and the fixed cipher key
+# is a constant in this repository, so publishing them publishes the server. A player
+# gets these from their own server, never from here.
+/dist/
+/pack.properties
+/list.txt
+/config.ini
+/launcher.ini
+
+# The same files copied in as test fixtures. The tests that read them skip when they are
+# absent — see tests/Shared/ShippingPackageFact.cs.
+tests/*/TestData/list.txt
+tests/*/TestData/config.ini
 
 # Game data and shipping layouts carried in for manual testing. Not source.
-runtime/
-data/SPR.txt
+/runtime/
+/data/SPR.txt
 
 # Working notes from the port. Local research log, not documentation.
-findings.md
-progress.md
-task_plan.md
+/findings.md
+/progress.md
+/task_plan.md
 
 # The original Rust implementation, kept locally as the behavioural specification.
-rust-reference/
+/rust-reference/
 
 # Local UI-automation helper with machine-specific paths.
-.drive.ps1
+/.drive.ps1

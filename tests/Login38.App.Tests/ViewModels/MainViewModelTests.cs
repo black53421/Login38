@@ -4,6 +4,7 @@ using Login38.App.ViewModels;
 using Login38.Core.Configuration;
 using Login38.Core.Servers;
 using Login38.Core.Text;
+using Login38.Tests;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -23,7 +24,7 @@ public sealed class MainViewModelTests : IDisposable
 {
     private readonly string _preferences = Path.Combine(Path.GetTempPath(), $"l38-{Guid.NewGuid():N}.ini");
 
-    private static string ShippingPackage => Path.Combine(AppContext.BaseDirectory, "TestData");
+    private static string PackageDirectory => Login38.Tests.ShippingPackage.Directory;
 
     /// <summary>Answers without touching the network.</summary>
     private sealed class StubProbe(bool reachable) : IServerProbe
@@ -42,7 +43,7 @@ public sealed class MainViewModelTests : IDisposable
         var catalog = new ServerCatalog(
             new LegacyTextCodec(TextEncodingMode.Big5),
             NullLogger<ServerCatalog>.Instance,
-            directory ?? ShippingPackage);
+            directory ?? PackageDirectory);
 
         var launcher = new GameLaunchService(
             new Login38.Patching.PatchPipeline([], NullLogger<Login38.Patching.PatchPipeline>.Instance),
@@ -54,7 +55,7 @@ public sealed class MainViewModelTests : IDisposable
         return new MainViewModel(catalog, launcher, probe, NullLogger<MainViewModel>.Instance, _preferences);
     }
 
-    [Fact]
+    [ShippingPackageFact]
     public async Task OffersTheServersFromTheOperatorsList()
     {
         var model = Build(new StubProbe(true));
@@ -67,7 +68,7 @@ public sealed class MainViewModelTests : IDisposable
 
     // The list has a fixed number of slots and the unused ones are still present, empty.
     // Offering them gives the player rows that cannot work.
-    [Fact]
+    [ShippingPackageFact]
     public async Task LeavesOutSlotsTheOperatorIsNotUsing()
     {
         var model = Build(new StubProbe(true));
@@ -78,7 +79,7 @@ public sealed class MainViewModelTests : IDisposable
         model.Servers.Count.ShouldBeLessThanOrEqualTo(ListFile.MaxServers);
     }
 
-    [Fact]
+    [ShippingPackageFact]
     public async Task SelectsSomethingSoThePlayerCanPressPlay()
     {
         var model = Build(new StubProbe(true));
@@ -89,7 +90,7 @@ public sealed class MainViewModelTests : IDisposable
         model.CanLaunch.ShouldBeTrue();
     }
 
-    [Fact]
+    [ShippingPackageFact]
     public async Task MarksServersThatAnswered()
     {
         var probe = new StubProbe(true);
@@ -101,7 +102,7 @@ public sealed class MainViewModelTests : IDisposable
         model.Servers.ShouldAllBe(s => s.Availability == ServerAvailability.Online);
     }
 
-    [Fact]
+    [ShippingPackageFact]
     public async Task MarksServersThatDidNot()
     {
         var model = Build(new StubProbe(false));

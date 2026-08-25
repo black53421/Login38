@@ -1,4 +1,5 @@
 using Login38.Core.Configuration;
+using Login38.Tests;
 using Login38.Core.Servers;
 using Shouldly;
 
@@ -17,7 +18,7 @@ public sealed class ShippingFileCompatibilityTests
 {
     private static string TestData(string name) => Path.Combine(AppContext.BaseDirectory, "TestData", name);
 
-    [Fact]
+    [ShippingPackageFact]
     public void ParsesTheShippingServerList()
     {
         var servers = ListFileCodec.ParseServers(File.ReadAllText(TestData("list.txt")));
@@ -35,7 +36,7 @@ public sealed class ShippingFileCompatibilityTests
         }
     }
 
-    [Fact]
+    [ShippingPackageFact]
     public void ReEncryptingTheShippingServerListReproducesItByteForByte()
     {
         var original = File.ReadAllText(TestData("list.txt"));
@@ -45,7 +46,7 @@ public sealed class ShippingFileCompatibilityTests
         Normalize(rebuilt).ShouldBe(Normalize(original));
     }
 
-    [Fact]
+    [ShippingPackageFact]
     public void DecryptsTheShippingConfig()
     {
         var encrypted = File.ReadAllText(TestData("config.ini"));
@@ -56,7 +57,7 @@ public sealed class ShippingFileCompatibilityTests
         plaintext.ShouldContain("[aux]");
     }
 
-    [Fact]
+    [ShippingPackageFact]
     public void ParsesTheShippingConfigIntoKnownKeys()
     {
         var plaintext = ConfigCipher.DecryptText(File.ReadAllText(TestData("config.ini")));
@@ -70,7 +71,7 @@ public sealed class ShippingFileCompatibilityTests
         parsed.Launcher.ActiveSkin.ShouldNotBeNullOrWhiteSpace();
     }
 
-    [Fact]
+    [ShippingPackageFact]
     public void ShippingConfigSurvivesADecryptEditReEncryptCycle()
     {
         var plaintext = ConfigCipher.DecryptText(File.ReadAllText(TestData("config.ini")));
