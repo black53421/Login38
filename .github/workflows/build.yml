@@ -8,6 +8,11 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# The default token is read-only, and the release step needs to create a release and
+# upload an asset to it.
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
