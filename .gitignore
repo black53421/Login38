@@ -36,6 +36,12 @@ tests/*/TestData/config.ini
 /findings.md
 /progress.md
 /task_plan.md
+/bot_plan.md
+
+# Raw memory captured while reverse engineering. Reproducible from a running client with
+# the scripts in tools/, and megabytes of it, so it is kept out.
+/_effectlist.raw
+*.raw
 
 # The original Rust implementation, kept locally as the behavioural specification.
 /rust-reference/
