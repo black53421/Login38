@@ -6,9 +6,6 @@ namespace Login38.Core.Text;
 /// </summary>
 public sealed class LegacyTextOptions
 {
-    /// <summary>Configuration section name.</summary>
-    public const string SectionName = "Text";
-
     /// <summary>How to resolve ambiguous legacy bytes. Defaults to guessing.</summary>
     public TextEncodingMode Mode { get; set; } = TextEncodingMode.Auto;
 }

@@ -35,7 +35,17 @@ public sealed class ThemeTests
     /// on the window type would also reach the ones the test harness builds — which have no
     /// composition target for a backdrop and no owner for a title bar.
     /// </remarks>
-    private static readonly HashSet<string> Exempt = ["FluentWindow"];
+    /// <summary>
+    /// Types a theme has nothing to say about.
+    /// </summary>
+    /// <remarks>
+    /// Both are containers rather than controls: the window is what the theme paints
+    /// <em>into</em>, and the dialog host is an empty presenter that takes no space until a
+    /// dialog is put in it. What needs styling in the second case is the dialog, and that is
+    /// styled — a rule that let a host through would have to let the dialog through too, so
+    /// they are named one at a time rather than by a pattern.
+    /// </remarks>
+    private static readonly HashSet<string> Exempt = ["FluentWindow", "ContentDialogHost"];
 
     /// <summary>Where the styles are written.</summary>
     private static readonly string[] Dictionaries =

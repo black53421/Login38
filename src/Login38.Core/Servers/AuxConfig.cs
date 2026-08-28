@@ -89,9 +89,13 @@ public sealed class AuxConfig
     public bool ExpDriftEnabled { get; set; } = true;
 
     /// <summary>
-    /// Not implemented in this build. The key is preserved so an operator's config
-    /// survives a round-trip, but nothing reads it.
+    /// Whether the helper offers automatic hunting at all.
     /// </summary>
+    /// <remarks>
+    /// The operator's switch rather than the player's: off, and the helper window has no
+    /// hunting page, so there is nothing to turn on. On, and the page appears with the
+    /// hunt still off until the player says otherwise.
+    /// </remarks>
     public bool InternalBotEnabled { get; set; }
 
     /// <summary>Maximum simultaneous clients. Zero means unlimited.</summary>
@@ -122,9 +126,6 @@ public sealed class AuxConfig
 
     /// <summary>How to decode legacy text from this client.</summary>
     public TextEncodingMode TextEncoding { get; set; } = TextEncodingMode.Big5;
-
-    /// <summary>Whether anything needs the HOME key listener installed.</summary>
-    public bool NeedsHomeKeyListener => LhxAuxEnabled;
 
     /// <summary>
     /// Forces invariants that hold regardless of what the file said. Applied on both

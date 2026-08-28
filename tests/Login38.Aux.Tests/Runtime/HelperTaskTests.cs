@@ -24,6 +24,18 @@ public sealed class HelperTaskTests : IDisposable
     private const int Bravery = 2;
     private const byte Prince = 0;
 
+    /// <summary>The client's own number for a transformed character.</summary>
+    private const int Polymorph = BuffState.Transformed;
+
+    /// <summary>
+    /// And for the shield the player's report was about.
+    /// </summary>
+    /// <remarks>
+    /// From the client's shield-icon handler, which turns the packet's icon type into an
+    /// effect number and falls through to this one.
+    /// </remarks>
+    private const int Shield = 4;
+
     private readonly RemoteProcess _process = RemoteProcess.Open((uint)Environment.ProcessId);
     private readonly RecordingDispatch _dispatch = new();
 
@@ -54,7 +66,7 @@ public sealed class HelperTaskTests : IDisposable
     [Fact]
     public void WaitsForTheServerToAnswerBeforeSendingAgain()
     {
-        var sent = new Dictionary<(EntryKind, int), TimeSpan> { [(EntryKind.Item, Haste)] = TimeSpan.Zero };
+        var sent = Sent((EntryKind.Item, Haste), unanswered: 1);
 
         HelperTask.Due(Item("加速藥水", Haste), Table(), sent, TimeSpan.FromSeconds(4), false)
             .ShouldBeFalse();
@@ -79,10 +91,101 @@ public sealed class HelperTaskTests : IDisposable
     [Fact]
     public void HoldsUpOnlyTheEntryThatWasSent()
     {
-        var sent = new Dictionary<(EntryKind, int), TimeSpan> { [(EntryKind.Item, Haste)] = TimeSpan.Zero };
+        var sent = Sent((EntryKind.Item, Haste), unanswered: 1);
 
         HelperTask.Due(Item("勇敢藥水", Bravery), Table(), sent, TimeSpan.FromSeconds(1), false)
             .ShouldBeTrue();
+    }
+
+    // ---- buffs the server will not grant -------------------------------------------------
+    //
+    // The cooldown paces a packet in flight. It does nothing about a buff the server refuses
+    // outright, which the effect byte cannot tell apart from one that has not arrived yet:
+    // the client sets that byte straight out of the packet — FUN_005355c0, the shield-icon
+    // handler, has no condition on it at all — so a byte that stays clear only ever means
+    // the packet never came. Asked for every five seconds, that is a character casting all
+    // evening and getting nowhere.
+
+    [Fact]
+    public void KeepsTheOrdinaryCooldownWhileTheServerIsStillAnswering() =>
+        HelperTask.Wait(HelperTask.Tolerated - 1).ShouldBe(HelperTask.Cooldown);
+
+    [Fact]
+    public void WaitsTwiceAsLongEachTimeAnEntryDoesNotArrive()
+    {
+        HelperTask.Wait(HelperTask.Tolerated).ShouldBe(HelperTask.Cooldown * 2);
+        HelperTask.Wait(HelperTask.Tolerated + 1).ShouldBe(HelperTask.Cooldown * 4);
+        HelperTask.Wait(HelperTask.Tolerated + 2).ShouldBe(HelperTask.Cooldown * 8);
+    }
+
+    // A minute, and it stays a minute however long the character stands there — including
+    // past the point where the shift behind it would have wrapped.
+    [Fact]
+    public void StopsStretchingTheWaitAtAMinute()
+    {
+        HelperTask.Wait(HelperTask.Tolerated + 3).ShouldBe(TimeSpan.FromMinutes(1));
+        HelperTask.Wait(HelperTask.Tolerated + 40).ShouldBe(TimeSpan.FromMinutes(1));
+        HelperTask.Wait(int.MaxValue).ShouldBe(TimeSpan.FromMinutes(1));
+    }
+
+    // What the player reported: a shield the server will not grant to a transformed
+    // character, asked for every five seconds for as long as the transformation lasted.
+    [Fact]
+    public void LeavesABuffTheServerRefusesAloneWhileTheTransformationLasts() =>
+        HelperTask.Due(
+            Skill("保護罩", Shield),
+            Table(Polymorph),
+            Sent((EntryKind.Skill, Shield), HelperTask.Tolerated, transformed: true),
+            TimeSpan.FromHours(1),
+            false).ShouldBeFalse();
+
+    // And asks for it the moment the character is themselves again, without the player
+    // having to switch anything off and on.
+    [Fact]
+    public void AsksForItAgainAsSoonAsTheTransformationEnds() =>
+        HelperTask.Due(
+            Skill("保護罩", Shield),
+            Table(),
+            Sent((EntryKind.Skill, Shield), HelperTask.Tolerated, transformed: true),
+            TimeSpan.FromSeconds(11),
+            false).ShouldBeTrue();
+
+    // Being transformed now is not on its own a reason to stop: the entry has to be one
+    // that has never arrived while transformed.
+    [Fact]
+    public void StillAsksForABuffThatFailedBeforeTheTransformationStarted() =>
+        HelperTask.Due(
+            Skill("保護罩", Shield),
+            Table(Polymorph),
+            Sent((EntryKind.Skill, Shield), HelperTask.Tolerated, transformed: false),
+            TimeSpan.FromSeconds(11),
+            false).ShouldBeTrue();
+
+    // Two unanswered sends is a slow server, not a refusal.
+    [Fact]
+    public void DoesNotReadAnythingIntoOneOrTwoUnansweredSends() =>
+        HelperTask.Due(
+            Skill("保護罩", Shield),
+            Table(Polymorph),
+            Sent((EntryKind.Skill, Shield), HelperTask.Tolerated - 1, transformed: true),
+            TimeSpan.FromSeconds(5),
+            false).ShouldBeTrue();
+
+    // An effect that arrives clears the record, so a buff that later runs out is replaced
+    // on the pass that notices rather than a cooldown after it.
+    [Fact]
+    public void ForgetsWhatItLearnedOnceTheEffectIsOnTheCharacter()
+    {
+        var task = Task();
+        var settings = Settings(Item("加速藥水", Haste));
+
+        task.Tick(Context(settings));
+        task.State = Table(Haste);
+        task.Tick(Context(settings));
+        task.State = Table();
+        task.Tick(Context(settings));
+
+        _dispatch.Sent.ShouldBe(["加速藥水", "加速藥水"]);
     }
 
     [Fact]
@@ -215,7 +318,12 @@ public sealed class HelperTaskTests : IDisposable
     private static HelperEntry Skill(string name, int stateId) =>
         new(stateId, name, EntryKind.Skill, CastTarget.Any(CastKind.OnSelf));
 
-    private static Dictionary<(EntryKind, int), TimeSpan> None() => [];
+    private static Dictionary<(EntryKind, int), HelperTask.Attempt> None() => [];
+
+    /// <summary>One entry that has been asked for and has not arrived.</summary>
+    private static Dictionary<(EntryKind, int), HelperTask.Attempt> Sent(
+        (EntryKind, int) key, int unanswered, bool transformed = false) =>
+        new() { [key] = new HelperTask.Attempt(TimeSpan.Zero, unanswered, transformed) };
 
     private static BuffState Table(params int[] up)
     {
@@ -230,11 +338,17 @@ public sealed class HelperTaskTests : IDisposable
     }
 
     /// <summary>A task reading a table the test laid out rather than the game's.</summary>
+    /// <remarks>
+    /// Settable, so that a test can put an effect on the character partway through and
+    /// watch what the helper does with it on the next pass.
+    /// </remarks>
     private sealed class StubTask(
         HelperDispatch dispatch, ILogger<HelperTask> logger, BuffState state)
         : HelperTask(dispatch, logger)
     {
-        internal override BuffState? Read(RemoteProcess process) => state;
+        public BuffState State { get; set; } = state;
+
+        internal override BuffState? Read(RemoteProcess process) => State;
     }
 
     /// <summary>A pass with nothing in the bag and a chosen world.</summary>

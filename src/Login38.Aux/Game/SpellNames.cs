@@ -30,29 +30,6 @@ internal static class SpellNames
         return Suffix(trimmed) is { } suffix ? trimmed[..suffix.Start].TrimEnd() : trimmed;
     }
 
-    /// <summary>
-    /// How far the skill reaches, in tiles, or null if the name does not say.
-    /// </summary>
-    /// <remarks>
-    /// The second number, whether the brackets hold two or three. Zero for anything cast on
-    /// oneself, which is most buffs.
-    /// </remarks>
-    internal static uint? RangeFrom(string name)
-    {
-        ArgumentNullException.ThrowIfNull(name);
-
-        if (Suffix(name.Trim()) is not { } suffix)
-        {
-            return null;
-        }
-
-        var parts = suffix.Inner.Split('/');
-
-        return parts.Length >= 2 && uint.TryParse(parts[1].Trim(), CultureInfo.InvariantCulture, out var range)
-            ? range
-            : null;
-    }
-
     /// <summary>Where the bracketed numbers are, if the name ends in some.</summary>
     private static (int Start, string Inner)? Suffix(string trimmed)
     {

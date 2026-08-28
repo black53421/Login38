@@ -192,9 +192,10 @@ public sealed class LauncherServicesTests
         scope.ServiceProvider.GetServices<IAuxTask>().Select(t => t.Name)
             .ShouldBe(
             [
-                "announcement", "profile", "toggles", "potions", "timers", "inventory",
-                "shout", "hotkeys", "helper keys", "delete", "buffs", "status",
-                "experience", "monster-colours", "packet-log", "notifications", "overlay",
+                "announcement", "profile", "toggles", "potions", "escape", "relocate", "timers",
+                "inventory", "spells", "shout", "hotkeys", "helper keys", "delete", "buffs",
+                "status", "experience", "monster-colours", "packet-log", "notifications",
+                "overlay", "hunt",
             ]);
     }
 

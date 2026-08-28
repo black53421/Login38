@@ -14,9 +14,9 @@ if not exist build mkdir build
 
 REM /LD=DLL  /MT=static CRT  /O2  /EHsc
 cl /nologo /utf-8 /LD /MT /O2 /EHsc /W3 /DWIN32 /D_WINDOWS ^
-   src\log.cpp src\present.cpp src\ime.cpp src\main.cpp ^
+   src\log.cpp src\present.cpp src\ats.cpp src\ime.cpp src\main.cpp ^
    /Fobuild\ /Febuild\l38ddraw.dll ^
-   /link user32.lib gdi32.lib imm32.lib ddraw.lib dxguid.lib d3d11.lib dxgi.lib
+   /link user32.lib gdi32.lib msimg32.lib imm32.lib ddraw.lib dxguid.lib d3d11.lib dxgi.lib
 
 set RC=%ERRORLEVEL%
 echo.

@@ -41,21 +41,4 @@ public sealed class SpellNamesTests
     [Fact]
     public void KeepsBracketsThatAreNotNumbers() =>
         SpellNames.StripSuffix("怪怪 (測試)").ShouldBe("怪怪 (測試)");
-
-    // The second number, whether there are two or three.
-    [Theory]
-    [InlineData("烈炎術 (20/3)", 3u)]
-    [InlineData("加速術 (40/0)", 0u)]
-    [InlineData("光箭 (15/8)", 8u)]
-    [InlineData("魔法相剋術 (40/0/2)", 0u)]
-    [InlineData("造痕術 (5/80/1)", 80u)]
-    public void ReadsHowFarASkillReaches(string full, uint range) =>
-        SpellNames.RangeFrom(full).ShouldBe(range);
-
-    [Theory]
-    [InlineData("加速術")]
-    [InlineData("怪怪 (測試)")]
-    [InlineData("單一 (40)")]
-    public void SaysNothingAboutRangeWhenTheNameDoesNot(string full) =>
-        SpellNames.RangeFrom(full).ShouldBeNull();
 }

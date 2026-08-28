@@ -66,4 +66,15 @@
     <PackageReference Include="Microsoft.Extensions.Options" />
   </ItemGroup>
 
+
+  <!-- The classic client's auto-hunt mark. Embedded rather than read off disk: the launcher
+       ships as one file and a picture beside it is a picture a player can lose. -->
+  <ItemGroup>
+    <Resource Include="Assets\Ats\*.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Login38.App.Tests" />
+  </ItemGroup>
+
 </Project>

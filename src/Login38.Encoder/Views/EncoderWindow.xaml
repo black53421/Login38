@@ -328,8 +328,9 @@
                             <CheckBox Content="金幣經驗值提示"
                                       Margin="{StaticResource RowSpacing}"
                                       IsChecked="{Binding GainDrift, Mode=TwoWay}" />
-                            <CheckBox Content="內掛系統"
+                            <CheckBox Content="開啟自動狩獵"
                                       Margin="{StaticResource RowSpacing}"
+                                      Visibility="{Binding Helper, Converter={StaticResource BooleanToVisibility}}"
                                       IsChecked="{Binding InternalBot, Mode=TwoWay}" />
 
                             <Separator Margin="0,10" />

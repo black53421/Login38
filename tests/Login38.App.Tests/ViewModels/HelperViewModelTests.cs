@@ -2,6 +2,7 @@ using System.IO;
 using Login38.App.ViewModels.Helper;
 using Login38.Aux.Game;
 using Login38.Aux.Settings;
+using Login38.Aux.Hunt;
 using Login38.Core.Text;
 using Login38.Interop;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -38,8 +39,48 @@ public sealed class HelperViewModelTests : IDisposable
     private HelperViewModel Window(InventoryWatch? bag = null) =>
         new(_source, Catalog(), bag);
 
+    private HelperViewModel WithoutHunting() =>
+        new(_source, Catalog(), null, null, null, null, null, huntingOffered: false);
+
     private static InventoryItem Item(string name) =>
         new(default(GameAddress), 0, 0x33, 0, false, 1, name);
+
+    // The operator's switch, not the player's. Off, and there is no hunting page at all —
+    // the window binds its visibility to this.
+    [Fact]
+    public void OffersHuntingUnlessTheOperatorHasSaidOtherwise()
+    {
+        Window().HuntingOffered.ShouldBeTrue();
+        WithoutHunting().HuntingOffered.ShouldBeFalse();
+    }
+
+    // A settings file written on a build that offered it would otherwise leave a character
+    // hunting with no page to say so and no way to stop it.
+    [Fact]
+    public void PublishesHuntingOffWhenItIsNotOffered()
+    {
+        var settings = new AuxSettings();
+        settings.Hunt.Enabled = true;
+
+        _source.Publish(settings);
+
+        var window = WithoutHunting();
+
+        window.Hunt.Enabled.ShouldBeTrue();
+        window.ToSettings().Hunt.Enabled.ShouldBeFalse();
+    }
+
+    // And left alone when it is, which is every ordinary build.
+    [Fact]
+    public void PublishesHuntingAsSetWhenItIsOffered()
+    {
+        var settings = new AuxSettings();
+        settings.Hunt.Enabled = true;
+
+        _source.Publish(settings);
+
+        Window().ToSettings().Hunt.Enabled.ShouldBeTrue();
+    }
 
     [Fact]
     public void ShowsWhatWasAlreadyPublished()
@@ -81,6 +122,32 @@ public sealed class HelperViewModelTests : IDisposable
 
         _source.Current.TimersEnabled.ShouldBeTrue();
         _source.Current.TimerRows[3].Command.ShouldBe("/say hello");
+    }
+
+    // The rotation's rows were not listened to, so a skill typed into one went nowhere: the
+    // window kept it, the settings never heard about it, and the hunt cast nothing while
+    // looking entirely set up. Nothing else on the row is touched here on purpose — the bug
+    // was that a skill row on its own published nothing, and touching a second setting hid it.
+    [Fact]
+    public void PublishesWhenOnlyASkillRowIsChanged()
+    {
+        using var window = Window();
+
+        window.Hunt.Skills[0].Enabled = true;
+        window.Hunt.Skills[0].Name = "bolt";
+
+        _source.Current.Hunt.Skills[0].Enabled.ShouldBeTrue();
+        _source.Current.Hunt.Skills[0].Name.ShouldBe("bolt");
+    }
+
+    [Fact]
+    public void PublishesWhenARowBecomesAWeaponTurn()
+    {
+        using var window = Window();
+
+        window.Hunt.Skills[1].StepIndex = (int)HuntStep.Weapon;
+
+        _source.Current.Hunt.Skills[1].Step.ShouldBe(HuntStep.Weapon);
     }
 
     [Fact]

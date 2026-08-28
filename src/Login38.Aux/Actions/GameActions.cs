@@ -168,8 +168,14 @@ public class GameActions
 
     /// <summary>Casts a skill.</summary>
     /// <param name="packed">The id the client's own spell table gives it.</param>
-    public virtual void Cast(RemoteProcess process, uint packed, SkillTarget target) =>
-        Run(process, SkillCast.Build(packed, target), nameof(Cast));
+    /// <param name="record">
+    /// Where the skill's own book record is, when it has been checked to still be that
+    /// skill's, so its icon cools with the cast. Left out and the cast is the same in every
+    /// way the server can see.
+    /// </param>
+    public virtual void Cast(
+        RemoteProcess process, uint packed, SkillTarget target, GameAddress record = default) =>
+        Run(process, SkillCast.Build(packed, target, record), nameof(Cast));
 
     /// <summary>Which code page the client is reading text as.</summary>
     private LegacyEncoding Encoding =>

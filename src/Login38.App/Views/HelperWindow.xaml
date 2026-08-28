@@ -30,16 +30,357 @@
         <Style TargetType="ui:TextBox" BasedOn="{StaticResource Library.TextBox}" />
         <Style TargetType="ui:NumberBox" BasedOn="{StaticResource Library.NumberBox}" />
         <Style TargetType="ui:InfoBar" BasedOn="{StaticResource Library.InfoBar}" />
+        <Style TargetType="ui:ContentDialog" BasedOn="{StaticResource Library.ContentDialog}" />
         <Style TargetType="ui:CardControl" BasedOn="{StaticResource Library.Card}" />
         <Style TargetType="ui:ProgressRing" BasedOn="{StaticResource Library.ProgressRing}" />
 
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibility" />
+
         <Thickness x:Key="RowSpacing">0,0,0,8</Thickness>
 
-        <!-- A label sitting to the left of the control it names. The width of the number
-             fields is the theme's business now; this is only the gap beside them. -->
+        <!--
+            A label sitting to the left of the control it names. The width of the number
+            fields is the theme's business now; this is only the gap beside them.
+
+            Declared up here with the other shared pieces, and before the templates that use
+            it, because a StaticResource cannot look forwards. It sat below them and the
+            dialog that wanted it threw on the way open — the templates further down the
+            file are only ever applied by the page around them, which is parsed later still,
+            so they never noticed.
+        -->
         <Style x:Key="FieldLabel" TargetType="TextBlock" BasedOn="{StaticResource Text.Label}">
             <Setter Property="Margin" Value="0,0,8,0" />
         </Style>
+
+        <!-- A button that opens a window rather than doing something. The ellipsis is the
+             convention that says so, and the width keeps a row of them even. -->
+        <Style x:Key="OpensADialog" TargetType="ui:Button"
+               BasedOn="{StaticResource {x:Type ui:Button}}">
+            <Setter Property="Appearance" Value="Secondary" />
+            <Setter Property="MinWidth" Value="150" />
+            <Setter Property="Margin" Value="0,0,8,8" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+
+            <!-- Said here rather than left to the appearance. Secondary paints its label in
+                 the library's own grey, which on this palette reads as disabled — four
+                 buttons that all look switched off, on a page where being switched off is a
+                 real state that other controls show. Primary ink for the label, accent for
+                 the icon, and the accent brightens under the pointer so the row answers
+                 back. -->
+            <Setter Property="Foreground" Value="{StaticResource Ink.Primary}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Line.Subtle}" />
+
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource Accent.Bright}" />
+                    <Setter Property="BorderBrush" Value="{StaticResource Accent.Deep}" />
+                </Trigger>
+
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Foreground" Value="{StaticResource Accent}" />
+                </Trigger>
+
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Foreground" Value="{StaticResource Ink.Disabled}" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!--
+            The bodies of the hunt's dialogs.
+
+            Kept as templates rather than as more of the page, because that is the whole
+            point of moving them: the page is what is looked at every session, and these are
+            what is set once. A template also keeps the binding paths exactly as they were
+            when this was all one page — the dialog is shown against the same view model.
+        -->
+        <DataTemplate x:Key="Hunt.Filters">
+            <Grid Width="620" Height="380">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <DockPanel Grid.Column="0">
+                    <TextBlock Style="{StaticResource Text.Section}" DockPanel.Dock="Top"
+                               Text="排除" Margin="0,0,0,6" />
+
+                    <Grid DockPanel.Dock="Top" Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <ui:TextBox Grid.Column="0" Margin="0,0,6,0"
+                                    PlaceholderText="怪物名稱"
+                                    Text="{Binding Blacklist.Candidate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:Button Grid.Column="1" Margin="0,0,6,0" Appearance="Secondary"
+                                   Content="新增" Command="{Binding Blacklist.AddCommand}" />
+                        <ui:Button Grid.Column="2" Appearance="Secondary"
+                                   Content="移除" Command="{Binding Blacklist.RemoveCommand}" />
+                    </Grid>
+
+                    <ListBox ItemsSource="{Binding Blacklist.Items}"
+                             SelectedItem="{Binding Blacklist.Selected, Mode=TwoWay}" />
+                </DockPanel>
+
+                <DockPanel Grid.Column="2">
+                    <TextBlock Style="{StaticResource Text.Section}" DockPanel.Dock="Top"
+                               Text="只打(空白 = 全打)" Margin="0,0,0,6" />
+
+                    <Grid DockPanel.Dock="Top" Margin="0,0,0,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <ui:TextBox Grid.Column="0" Margin="0,0,6,0"
+                                    PlaceholderText="怪物名稱"
+                                    Text="{Binding Whitelist.Candidate, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <ui:Button Grid.Column="1" Margin="0,0,6,0" Appearance="Secondary"
+                                   Content="新增" Command="{Binding Whitelist.AddCommand}" />
+                        <ui:Button Grid.Column="2" Appearance="Secondary"
+                                   Content="移除" Command="{Binding Whitelist.RemoveCommand}" />
+                    </Grid>
+
+                    <ListBox ItemsSource="{Binding Whitelist.Items}"
+                             SelectedItem="{Binding Whitelist.Selected, Mode=TwoWay}" />
+                </DockPanel>
+            </Grid>
+        </DataTemplate>
+
+        <DataTemplate x:Key="Hunt.Stall">
+            <StackPanel Width="460">
+                <TextBlock Style="{StaticResource Text.Caption}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,12"
+                           Text="怪物站在走不到的地方時,角色會停在原地。這兩個數字決定多久算是停住,以及停住後把牠擱置多久。" />
+
+                <Grid Margin="{StaticResource RowSpacing}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="停住幾秒放棄"
+                               Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                    <ui:NumberBox Grid.Column="1" Minimum="1" Maximum="120" MaxDecimalPlaces="0"
+                                  ClearButtonEnabled="False"
+                                  ValidationMode="InvalidInputOverwritten"
+                                  Value="{Binding StallSeconds, Mode=TwoWay}" />
+                </Grid>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="擱置幾秒再試"
+                               Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                    <ui:NumberBox Grid.Column="1" Minimum="1" Maximum="600" MaxDecimalPlaces="0"
+                                  ClearButtonEnabled="False"
+                                  ValidationMode="InvalidInputOverwritten"
+                                  Value="{Binding IgnoreSeconds, Mode=TwoWay}" />
+                </Grid>
+
+                <TextBlock Style="{StaticResource Text.Caption}"
+                           TextWrapping="Wrap"
+                           Margin="0,24,0,12"
+                           Text="換點不是逃跑:這一區打完了或走不過去就換個地方,繼續掛。卡住的判斷是沒移動而且沒有任何怪在掉血,所以遠程站著射不算;建議 30 秒以上。填 0 表示不看那一項。" />
+
+                <CheckBox Content="卡住或沒怪時換點"
+                          Margin="{StaticResource RowSpacing}"
+                          IsChecked="{Binding RelocateEnabled, Mode=TwoWay}" />
+
+                <Grid Margin="{StaticResource RowSpacing}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="原地不動"
+                               Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                    <ui:NumberBox Grid.Column="1" Margin="0,0,8,0"
+                                  Minimum="0" Maximum="600" MaxDecimalPlaces="0"
+                                  ClearButtonEnabled="False"
+                                  ValidationMode="InvalidInputOverwritten"
+                                  Value="{Binding RelocateStuckSeconds, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="2" Text="秒"
+                               Style="{StaticResource Text.Caption}" VerticalAlignment="Center" />
+                </Grid>
+
+                <Grid Margin="{StaticResource RowSpacing}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="附近沒怪"
+                               Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                    <ui:NumberBox Grid.Column="1" Margin="0,0,8,0"
+                                  Minimum="0" Maximum="600" MaxDecimalPlaces="0"
+                                  ClearButtonEnabled="False"
+                                  ValidationMode="InvalidInputOverwritten"
+                                  Value="{Binding RelocateBarrenSeconds, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="2" Text="秒"
+                               Style="{StaticResource Text.Caption}" VerticalAlignment="Center" />
+                </Grid>
+
+                <Grid Margin="{StaticResource RowSpacing}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="卷軸"
+                               Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                    <ComboBox Grid.Column="1"
+                              IsEditable="True"
+                              Text="{Binding RelocateItem, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                              ItemsSource="{Binding DataContext.BagChoices, RelativeSource={RelativeSource AncestorType=Window}}" />
+                </Grid>
+
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate x:Key="Hunt.Skills">
+            <StackPanel Width="620">
+                <TextBlock Style="{StaticResource Text.Caption}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,12"
+                           Text="由上往下輪流,一次出手用掉一格,到底再回到第一格。普攻那一格不放技能,它換到的是間隔——中間想隔幾下就放幾格普攻。輪到的技能還在冷卻、魔力不夠或不在射程,就跳過,下一輪再回來。射程與是不是攻擊魔法都讀客戶端自己的魔法書。" />
+
+                <Grid Margin="{StaticResource RowSpacing}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="1" Text="這一格" Width="88"
+                               Style="{StaticResource Text.Caption}" Margin="0,0,8,0" />
+                    <TextBlock Grid.Column="2" Text="魔法名稱"
+                               Style="{StaticResource Text.Caption}" Margin="0,0,8,0" />
+                    <TextBlock Grid.Column="3" Text="間隔(秒)" Width="86"
+                               Style="{StaticResource Text.Caption}" Margin="0,0,8,0" />
+                    <TextBlock Grid.Column="4" Text="魔力 ≥ %" Width="86"
+                               Style="{StaticResource Text.Caption}" />
+                </Grid>
+
+                <ItemsControl ItemsSource="{Binding Skills}"
+                              >
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate DataType="{x:Type helper:HuntSkillRowViewModel}">
+                            <Grid Margin="{StaticResource RowSpacing}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <CheckBox Grid.Column="0"
+                                          Margin="0,0,4,0"
+                                          VerticalAlignment="Center"
+                                          IsChecked="{Binding Enabled, Mode=TwoWay}" />
+
+                                <ComboBox Grid.Column="1"
+                                          Margin="0,0,8,0"
+                                          Width="88"
+                                          SelectedIndex="{Binding StepIndex, Mode=TwoWay}">
+                                    <ComboBoxItem Content="技能" />
+                                    <ComboBoxItem Content="普攻" />
+                                </ComboBox>
+
+                                <ComboBox Grid.Column="2"
+                                          Margin="0,0,8,0"
+                                          IsEditable="True"
+                                          IsEnabled="{Binding IsSkill}"
+                                          Text="{Binding Name, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                                          ItemsSource="{Binding DataContext.SkillChoices, RelativeSource={RelativeSource AncestorType=Window}}" />
+
+                                <ui:NumberBox Grid.Column="3"
+                                              Margin="0,0,8,0"
+                                              Width="86"
+                                              Minimum="0"
+                                              Maximum="600"
+                                              MaxDecimalPlaces="1"
+                                              IsEnabled="{Binding IsSkill}"
+                                              ClearButtonEnabled="False"
+                                              ValidationMode="InvalidInputOverwritten"
+                                              Value="{Binding IntervalSeconds, Mode=TwoWay}" />
+
+                                <ui:NumberBox Grid.Column="4"
+                                              Width="86"
+                                              Minimum="0"
+                                              Maximum="100"
+                                              MaxDecimalPlaces="0"
+                                              IsEnabled="{Binding IsSkill}"
+                                              ClearButtonEnabled="False"
+                                              ValidationMode="InvalidInputOverwritten"
+                                              Value="{Binding ManaAtLeast, Mode=TwoWay}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </DataTemplate>
+
+        <DataTemplate x:Key="Hunt.Scrolls">
+            <StackPanel Width="460">
+                <TextBlock Style="{StaticResource Text.Caption}"
+                           TextWrapping="Wrap"
+                           Margin="0,0,0,12"
+                           Text="血量掉到設定值以下讀一張,讀完會把自動打怪關掉,要等血量回到設定值以上才會再讀第二張。落點由角色身上的傳送控制戒指和伺服器決定,這裡管不到。" />
+
+                <CheckBox Content="血量過低時讀卷軸"
+                          Margin="{StaticResource RowSpacing}"
+                          IsChecked="{Binding EscapeEnabled, Mode=TwoWay}" />
+
+                <Grid Margin="{StaticResource RowSpacing}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="血量低於"
+                               Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                    <ui:NumberBox Grid.Column="1" Margin="0,0,8,0"
+                                  Minimum="1" Maximum="99" MaxDecimalPlaces="0"
+                                  ClearButtonEnabled="False"
+                                  ValidationMode="InvalidInputOverwritten"
+                                  Value="{Binding EscapeHitPoints, Mode=TwoWay}" />
+                    <TextBlock Grid.Column="2" Text="%"
+                               Style="{StaticResource Text.Caption}" VerticalAlignment="Center" />
+                </Grid>
+
+                <Grid Margin="{StaticResource RowSpacing}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="0" Text="卷軸"
+                               Style="{StaticResource FieldLabel}" VerticalAlignment="Center" />
+                    <ComboBox Grid.Column="1"
+                              IsEditable="True"
+                              Text="{Binding EscapeItem, Mode=TwoWay, UpdateSourceTrigger=LostFocus}"
+                              ItemsSource="{Binding DataContext.BagChoices, RelativeSource={RelativeSource AncestorType=Window}}" />
+                </Grid>
+
+
+            </StackPanel>
+        </DataTemplate>
     </ui:FluentWindow.Resources>
 
     <!-- The window paints its own background rather than leaving it to the window's
@@ -276,6 +617,114 @@
                         </lui:Section>
                     </Grid>
                 </Grid>
+            </TabItem>
+
+            <!-- ==================== Hunt ==================== -->
+            <TabItem Header="狩獵"
+                     Visibility="{Binding HuntingOffered, Converter={StaticResource BooleanToVisibility}}"
+                     lui:Rail.Icon="{ui:SymbolIcon TargetArrow24}"
+                     lui:Rail.Note="自動狩獵">
+                <StackPanel Margin="12" DataContext="{Binding Hunt}">
+                    <lui:Section Header="自動狩獵"
+                                 Note="選目標、算路線、繞開牆和擋路的怪都在這裡做;客戶端只負責把腳步和攻擊動作演出來。">
+                        <StackPanel>
+                            <CheckBox Content="自動找怪並攻擊"
+                                      Margin="{StaticResource RowSpacing}"
+                                      IsChecked="{Binding Enabled, Mode=TwoWay}" />
+
+                            <CheckBox Content="被攻擊時改打真正打我的那隻"
+                                      Margin="{StaticResource RowSpacing}"
+                                      ToolTip="讀客戶端自己記的「誰在攻擊我」名單,不是猜最近的那隻。"
+                                      IsChecked="{Binding Retaliate, Mode=TwoWay}" />
+
+                            <Grid>
+                                <!-- The field column takes its width from the control
+                                     rather than being given one. The theme sets a number
+                                     box a minimum wide enough for its largest value, and a
+                                     column narrower than that does not shrink the box — it
+                                     lets the box overrun and sit on what is beside it. -->
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           Text="搜尋範圍"
+                                           Style="{StaticResource FieldLabel}"
+                                           VerticalAlignment="Center" />
+
+                                <ui:NumberBox Grid.Column="1"
+                                              Margin="0,0,8,0"
+                                              Minimum="1"
+                                              Maximum="200"
+                                              MaxDecimalPlaces="0"
+                                              ClearButtonEnabled="False"
+                                              ValidationMode="InvalidInputOverwritten"
+                                              Value="{Binding RangeSteps, Mode=TwoWay}" />
+
+                                <TextBlock Grid.Column="2"
+                                           Text="步,超過這個距離的怪不找"
+                                           Style="{StaticResource Text.Caption}"
+                                           TextWrapping="Wrap"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+
+                            <Grid Margin="{StaticResource RowSpacing}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           Text="遠程站位"
+                                           Style="{StaticResource FieldLabel}"
+                                           VerticalAlignment="Center" />
+
+                                <ui:NumberBox Grid.Column="1"
+                                              Margin="0,0,8,0"
+                                              Minimum="1"
+                                              Maximum="30"
+                                              MaxDecimalPlaces="0"
+                                              ClearButtonEnabled="False"
+                                              ValidationMode="InvalidInputOverwritten"
+                                              Value="{Binding StandoffTiles, Mode=TwoWay}" />
+
+                                <TextBlock Grid.Column="2"
+                                           Text="格,同時決定走多近和算不算在射程內"
+                                           Style="{StaticResource Text.Caption}"
+                                           TextWrapping="Wrap"
+                                           VerticalAlignment="Center" />
+                            </Grid>
+                        </StackPanel>
+                    </lui:Section>
+
+                    <lui:Section Header="細部設定"
+                                 Note="設一次就好的東西各自開窗,不擠在這一頁。">
+                        <WrapPanel>
+                            <ui:Button Style="{StaticResource OpensADialog}"
+                                       Icon="{ui:SymbolIcon PersonProhibited24}"
+                                       Content="怪物過濾…"
+                                       Click="OpenHuntFilters" />
+
+                            <ui:Button Style="{StaticResource OpensADialog}"
+                                       Icon="{ui:SymbolIcon Timer24}"
+                                       Content="卡住處理…"
+                                       Click="OpenHuntStall" />
+
+                            <ui:Button Style="{StaticResource OpensADialog}"
+                                       Icon="{ui:SymbolIcon Flash24}"
+                                       Content="攻擊順序…"
+                                       Click="OpenHuntSkills" />
+
+                            <ui:Button Style="{StaticResource OpensADialog}"
+                                       Icon="{ui:SymbolIcon ArrowExit24}"
+                                       Content="逃跑卷軸…"
+                                       Click="OpenHuntScrolls" />
+                        </WrapPanel>
+                    </lui:Section>
+                </StackPanel>
             </TabItem>
 
             <TabItem Header="狀態"
@@ -718,5 +1167,10 @@
                        Command="{Binding ReloadItemListCommand}" />
         </Grid>
         </Border>
+
+        <!-- Where the dialogs are drawn. Last child and across every row, so it covers the
+             window rather than a corner of it, and it takes no space until something is
+             shown in it. -->
+        <ui:ContentDialogHost x:Name="DialogHost" Grid.Row="0" Grid.RowSpan="3" />
     </Grid>
 </ui:FluentWindow>

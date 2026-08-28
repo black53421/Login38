@@ -1,4 +1,5 @@
 ﻿using System.Text.Json.Serialization;
+using Login38.Aux.Hunt;
 
 namespace Login38.Aux.Settings;
 
@@ -223,6 +224,10 @@ public sealed class AuxSettings
     [JsonPropertyName("misc")]
     public MiscToggles Misc { get; set; } = new();
 
+    /// <summary>What the hunt has been asked to do.</summary>
+    [JsonPropertyName("hunt")]
+    public HuntSettings Hunt { get; set; } = new();
+
     [JsonPropertyName("timer_master_enabled")]
     public bool TimersEnabled { get; set; }
 
@@ -245,6 +250,7 @@ public sealed class AuxSettings
 
         ManaWhenSafe ??= new ManaWhenSafeRule();
         Misc ??= new MiscToggles();
+        Hunt = (Hunt ?? new HuntSettings()).Normalise();
         HelperEntries ??= [];
         HelperInventoryEntries ??= [];
         DeleteList ??= [];

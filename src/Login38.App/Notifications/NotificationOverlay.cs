@@ -48,7 +48,7 @@ internal sealed class NotificationOverlay : Window
 
     /// <summary>Puts it over the game's picture and draws a frame.</summary>
     /// <param name="area">Where the game's picture is, in real pixels.</param>
-    internal void Draw(ScreenArea area, BoardSnapshot board, TimeSpan now)
+    internal void Draw(ScreenArea area, BoardSnapshot board, TimeSpan now, bool hunting)
     {
         var scale = FromDevice();
 
@@ -71,7 +71,7 @@ internal sealed class NotificationOverlay : Window
             Height = height;
         }
 
-        _surface.Show(board, now);
+        _surface.Show(board, now, hunting);
 
         if (!IsVisible)
         {
@@ -82,6 +82,10 @@ internal sealed class NotificationOverlay : Window
     /// <summary>Takes it off the screen without throwing away what it has read.</summary>
     internal void Conceal()
     {
+        // Before the window goes, because a hidden window still has a surface and the
+        // surface is what asked the compositor for a frame every frame.
+        _surface.Rest();
+
         if (IsVisible)
         {
             Hide();

@@ -1,5 +1,6 @@
 ﻿using Login38.Aux.Actions;
 using Login38.Aux.Game;
+using Login38.Aux.Hunt;
 using Login38.App.Notifications;
 using Login38.Aux.Notifications;
 using Login38.Aux.Runtime;
@@ -103,12 +104,29 @@ public static class LauncherServices
 
         services.AddScoped<HelperKeyTask>();
 
+        // The hunt's three pieces. The hook and the chain hold state that belongs to one
+        // game — where the cave went, what is being fought — so they are scoped with it
+        // rather than shared, which is what the reference got wrong with two clients up.
+        services.AddScoped<TargetScan>();
+        services.AddScoped<HuntSwitch>();
+        services.AddScoped<SpellWatch>();
+        services.AddScoped<ChaseHook>();
+        services.AddScoped<ClickHook>();
+        services.AddScoped<AttackChain>();
+        services.AddScoped<RouteWalk>();
+        services.AddScoped<SkillVolley>();
+        services.AddScoped<CastWatch>();
+        services.AddScoped<HuntTask>();
+
         services.AddScoped<IAuxTask, AnnouncementTask>();
         services.AddScoped<IAuxTask, ProfileTask>();
         services.AddScoped<IAuxTask, ToggleTask>();
         services.AddScoped<IAuxTask, PotionTask>();
+        services.AddScoped<IAuxTask, EscapeTask>();
+        services.AddScoped<IAuxTask, RelocateTask>();
         services.AddScoped<IAuxTask>(services => services.GetRequiredService<TimerTask>());
         services.AddScoped<IAuxTask, InventoryTask>();
+        services.AddScoped<IAuxTask, SpellTask>();
         services.AddScoped<IAuxTask, ShoutTask>();
         services.AddScoped<IAuxTask, HotkeyTask>();
         services.AddScoped<IAuxTask>(services => services.GetRequiredService<HelperKeyTask>());
@@ -120,6 +138,9 @@ public static class LauncherServices
         services.AddScoped<IAuxTask, PacketSpyTask>();
         services.AddScoped<IAuxTask, NotificationTask>();
         services.AddScoped<IAuxTask, OverlayTask>();
+
+        // Both, and the same instance: the window shows what is being fought.
+        services.AddScoped<IAuxTask>(services => services.GetRequiredService<HuntTask>());
 
         return services;
     }

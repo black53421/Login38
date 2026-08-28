@@ -66,6 +66,18 @@ public static class NotificationLayout
     /// <summary>And how far in from the left edge.</summary>
     internal static int ToastAnchorX(int width) => width * 12 / 1000;
 
+    /// <summary>
+    /// Where the bottom of the hunt's mark sits, above the client's own bottom bar.
+    /// </summary>
+    /// <remarks>
+    /// Measured off the classic layout rather than chosen: its HUD is authored for 1280x960
+    /// and the bar along the bottom is 205 tall — <c>HudMainSlotLayout</c> 292x205 on the
+    /// right, the HP and MP wing the same height on the left — which is a shade under 22 parts
+    /// in a hundred. Resting the mark on 78 puts it just clear of that at any size, and being
+    /// a proportion it stays clear when the picture is scaled.
+    /// </remarks>
+    public static int MarkBottomY(int height) => height * 78 / 100;
+
     /// <summary>Where the numbers drift from.</summary>
     internal static int DriftAnchorX(int width) => width * 62 / 100;
 

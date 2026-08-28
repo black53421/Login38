@@ -9,9 +9,10 @@ namespace Login38.App.ViewModels.Helper;
 /// </summary>
 /// <remarks>
 /// <para>
-/// One of these for each of the four lists in the helper window — what to keep up, what to
-/// destroy, what to dissolve, what to shout. They differ in what goes in them and in
-/// nothing else, so the reference's nine near-identical handlers are one thing here.
+/// One of these for each of the six lists in the helper window — what to keep up, what to
+/// destroy, what to dissolve, what to shout, what never to attack, what only to attack.
+/// They differ in what goes in them and in nothing else, so the reference's nine
+/// near-identical handlers are one thing here.
 /// </para>
 /// <para>
 /// <see cref="Candidate"/> is whatever the control beside the list currently holds: the

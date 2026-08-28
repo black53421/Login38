@@ -332,11 +332,21 @@
         ItemsControl has no template of its own worth replacing — it is a panel with a
         border — but it does inherit the font, and a repeated row that inherits nothing
         else is the one place a stray face shows up.
+
+        No Foreground setter, and that is not an omission. An ItemsControl built inside a
+        dialog's template cannot reach this palette when its style is applied: the setter
+        resolves to UnsetValue, and Foreground is one of the few properties that refuses
+        UnsetValue outright rather than falling back — so the whole dialog dies on the way
+        open with "Initialization of 'ItemsControl' threw an exception" and nothing in the
+        message naming the property. ListBox survives the same treatment, which is what
+        made it look like a fault in the markup rather than in here.
+
+        Nothing is lost by leaving it out: Foreground inherits, so a list inside a dialog
+        already draws in the colour the dialog is drawn in, which is this one.
     -->
     <Style TargetType="ItemsControl">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Foreground" Value="{StaticResource Ink.Primary}" />
         <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
         <Setter Property="FontSize" Value="{StaticResource Size.Body}" />
     </Style>

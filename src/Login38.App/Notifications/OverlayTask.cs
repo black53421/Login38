@@ -25,11 +25,12 @@ namespace Login38.App.Notifications;
 /// toast at all.
 /// </para>
 /// </remarks>
-public sealed class OverlayTask : IAuxTask, IAuxTaskShutdown
+public sealed class OverlayTask : IAuxTask, IAuxTaskShutdown, IDisposable
 {
     private readonly NotificationBoard _board;
     private readonly SpriteArtwork _artwork;
     private readonly ILogger<OverlayTask> _logger;
+    private readonly AtsMark _mark;
 
     private NotificationOverlay? _overlay;
     private GameWindow? _window;
@@ -40,6 +41,7 @@ public sealed class OverlayTask : IAuxTask, IAuxTaskShutdown
         _board = board;
         _artwork = artwork;
         _logger = logger;
+        _mark = new AtsMark(logger);
     }
 
     /// <inheritdoc/>
@@ -60,7 +62,20 @@ public sealed class OverlayTask : IAuxTask, IAuxTaskShutdown
 
         var misc = context.Settings.Misc;
 
-        if (!misc.PickupToast && !misc.GainDrift)
+        // The hunt's own mark, which is not a notification and is not switched by either of
+        // the notification settings. It is on for exactly as long as the hunt is, and only
+        // in the world — a mark over the character select screen would be a lie.
+        var running = context.Settings.Hunt.Enabled && context.IsInWorld;
+
+        // Said before anything else and whatever else happens on this pass, because the game
+        // draws it from here on and the overlay may have nothing to do at all.
+        _mark.Set(context.Process.Id, running);
+
+        // Only the launcher's copy of it. Once the game is drawing the mark itself, drawing a
+        // second one over the top is two marks.
+        var hunting = running && !_mark.IsLive;
+
+        if (!hunting && !misc.PickupToast && !misc.GainDrift)
         {
             Hide();
 
@@ -71,7 +86,7 @@ public sealed class OverlayTask : IAuxTask, IAuxTaskShutdown
 
         // Read before the artwork is: a player who never picks anything up never has the
         // client's archives opened, and never has a window made for them.
-        if (board.IsEmpty)
+        if (board.IsEmpty && !hunting)
         {
             Hide();
 
@@ -87,7 +102,7 @@ public sealed class OverlayTask : IAuxTask, IAuxTaskShutdown
             : OverlayPlacement.Where(
                 new OverlayPlacement.WindowState(
                     _window.IsVisible, _window.IsMinimised, _window.IsForeground, _window.ClientArea()),
-                anythingToShow: !board.IsEmpty);
+                anythingToShow: !board.IsEmpty || hunting);
 
         if (where is not { } area)
         {
@@ -96,13 +111,15 @@ public sealed class OverlayTask : IAuxTask, IAuxTaskShutdown
             return;
         }
 
-        Post(overlay => overlay.Draw(area, board, _board.Elapsed));
+        Post(overlay => overlay.Draw(area, board, _board.Elapsed, hunting));
     }
 
     /// <inheritdoc/>
     /// <remarks>Nothing is made here: a window that was never needed is not created to close.</remarks>
     public void Stopping()
     {
+        _mark.Stop();
+
         if (_overlay is null)
         {
             return;
@@ -114,6 +131,14 @@ public sealed class OverlayTask : IAuxTask, IAuxTaskShutdown
             _overlay = null;
         });
     }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// The block the game reads is the only thing here that is not the launcher's own memory.
+    /// <see cref="Stopping"/> is what normally lets go of it; this is for a host that takes
+    /// its tasks apart without stopping them.
+    /// </remarks>
+    public void Dispose() => _mark.Dispose();
 
     /// <summary>Takes it off the screen, if there is one.</summary>
     private void Hide()

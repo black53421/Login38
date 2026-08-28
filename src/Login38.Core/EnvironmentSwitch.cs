@@ -22,10 +22,6 @@ public static class EnvironmentSwitch
     public static bool IsDisabled(string name) =>
         BooleanText.IsFalsy(Environment.GetEnvironmentVariable(name));
 
-    /// <summary>Whether the named variable is set at all, regardless of value.</summary>
-    public static bool IsSet(string name) =>
-        !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(name));
-
     /// <summary>The variable's raw value, or null when unset or empty.</summary>
     public static string? Value(string name)
     {

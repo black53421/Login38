@@ -33,6 +33,13 @@ namespace gaddr {
 //   is565    = true:RGB565,false:RGB555
 void PresentBits16(HWND hwnd, const void* bits, int srcPitch, int sw, int sh, bool is565);
 
+// ───────────────────────── ats.cpp ─────────────────────────
+//  自動狩獵標記,直接畫在 present 交出去前的 backbuffer HDC 上。
+//   AtsPublish() 建立 launcher 用來開關它的具名共享記憶體(Local\l38ats_<pid>)。
+//   AtsDraw()    畫一幀;狩獵沒開就什麼也不做。cw/ch 是視窗 client 尺寸。
+void AtsPublish();
+void AtsDraw(HDC dst, int cw, int ch);
+
 // ───────────────────────── main.cpp ─────────────────────────
 void InstallRenderHooks();
 

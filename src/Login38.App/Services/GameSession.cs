@@ -76,6 +76,7 @@ public sealed class GameSession : IAsyncDisposable
         _relay = relay;
         _aux = aux;
         _logger = logger;
+        HuntingOffered = context.Aux.InternalBotEnabled;
         _cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         Patching = Task.Run(() => PatchAsync(context, pipeline, _cancellation.Token), CancellationToken.None);
@@ -85,6 +86,13 @@ public sealed class GameSession : IAsyncDisposable
 
     /// <summary>The game's process id.</summary>
     public uint ProcessId => _game.Id;
+
+    /// <summary>Whether the operator's config offers automatic hunting.</summary>
+    /// <remarks>
+    /// Taken once, at launch, because it belongs to the server list this game was started
+    /// from and cannot change while it is running.
+    /// </remarks>
+    public bool HuntingOffered { get; }
 
     /// <summary>Completes when every phase of patching has been attempted.</summary>
     public Task<IReadOnlyList<PatchOutcome>> Patching { get; }
@@ -120,9 +128,6 @@ public sealed class GameSession : IAsyncDisposable
 
     /// <summary>Whether the game is still running.</summary>
     public bool IsRunning => _game.Process.IsRunning;
-
-    /// <summary>Where the client was pointed, when a relay was put in front of the server.</summary>
-    public System.Net.IPEndPoint? RelayEndpoint => _relay?.Endpoint;
 
     private async Task<IReadOnlyList<PatchOutcome>> PatchAsync(
         GamePatchContext context, PatchPipeline pipeline, CancellationToken cancellationToken)

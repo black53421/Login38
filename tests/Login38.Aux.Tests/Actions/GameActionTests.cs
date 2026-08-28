@@ -212,17 +212,70 @@ public sealed class GameActionTests
         ((SkillCast.High(Packed) << 3) | SkillCast.Low(Packed)).ShouldBe(Packed);
     }
 
-    // Through the client rather than as a packet, so the animation and the cooldown run.
-    // The attack global, not the cast one — the cast one sends it down the item path.
+    // The delay the client would have worked out, then the packet the client would have
+    // sent, then the client's own routine for stamping the cooldown. Its entry point is not
+    // called at all, because the third thing it does is arm the cursor.
     [Fact]
-    public void CastsAtSomethingInTheWorldThroughTheClient() =>
+    public void CastsAtSomethingInTheWorldWithoutArmingTheCursor() =>
         SkillCast.Build(Packed, SkillTarget.Entity(0x8888)).ShouldBe(
         [
-            0x60, 0xA1, 0x0C, 0xC9, 0x97, 0x00, 0x50, 0xC7, 0x05, 0x0C, 0xC9, 0x97,
-            0x00, 0x88, 0x88, 0x00, 0x00, 0x6A, 0x01, 0x68, 0x2A, 0x00, 0x00, 0x00,
-            0x8B, 0x0D, 0x24, 0x13, 0xC3, 0x00, 0xB8, 0xE0, 0xEC, 0x73, 0x00, 0xFF,
-            0xD0, 0x58, 0xA3, 0x0C, 0xC9, 0x97, 0x00, 0x61, 0xC3,
+            0x60,
+            0x6A, 0x13,                                 // push 0x13
+            0x8B, 0x0D, 0xB8, 0xD2, 0xC2, 0x00,         // mov ecx, [g_local_player]
+            0xB8, 0x30, 0xE5, 0x5A, 0x00, 0xFF, 0xD0,   // call FUN_005AE530
+            0x0F, 0xBF, 0x15, 0x84, 0xD6, 0x96, 0x00,   // movsx edx, word [delays + 42*2]
+            0x03, 0xC2,                                 // add eax, edx
+            0xA3, 0x10, 0x13, 0xC3, 0x00,               // mov [castDelay], eax
+            0x68, 0x88, 0x88, 0x00, 0x00,               // push objectId
+            0x68, 0x02, 0x00, 0x00, 0x00,               // push low
+            0x68, 0x05, 0x00, 0x00, 0x00,               // push high
+            0x68, 0x06, 0x00, 0x00, 0x00,               // push opcode
+            0x68, 0x28, 0xF0, 0x8E, 0x00,               // push "cccd"
+            0xB8, 0x50, 0x0E, 0x58, 0x00, 0xFF, 0xD0,   // call FUN_00580E50
+            0x83, 0xC4, 0x14,
+            0xB8, 0x10, 0xBB, 0x73, 0x00, 0xFF, 0xD0,   // call FUN_0073BB10
+            0x61, 0xC3,
         ]);
+
+    // The skill's own icon, when the book record can be trusted. Before the cast, which is
+    // the order the client itself does it in.
+    [Fact]
+    public void CoolsTheSkillsOwnIconWhenTheRecordIsKnown()
+    {
+        var code = SkillCast.Build(Packed, SkillTarget.Entity(0x8888), new GameAddress(0x0BADF00D));
+
+        code.AsSpan().IndexOf<byte>(
+        [
+            0xC6, 0x05, 0xC9, 0xF0, 0xAD, 0x0B, 0x00,   // mov byte [record + 0xBC], 0
+            0xB9, 0x0D, 0xF0, 0xAD, 0x0B,               // mov ecx, record
+            0xB8, 0x50, 0xB9, 0x73, 0x00, 0xFF, 0xD0,   // call FUN_0073B950
+        ]).ShouldBeGreaterThan(-1);
+
+        // And the cast still goes out, which is the part that matters.
+        code.AsSpan().IndexOf<byte>([0xB8, 0x50, 0x0E, 0x58, 0x00, 0xFF, 0xD0]).ShouldBeGreaterThan(-1);
+    }
+
+    // A record read before a level, a relog or a character change points at memory the
+    // client has given back. Writing into it would be a fault rather than a wrong icon.
+    [Fact]
+    public void LeavesTheIconAloneWithoutARecord() =>
+        SkillCast.Build(Packed, SkillTarget.Entity(0x8888))
+            .AsSpan()
+            .IndexOf<byte>([0xB8, 0x50, 0xB9, 0x73, 0x00, 0xFF, 0xD0])
+            .ShouldBe(-1);
+
+    // The whole reason it is assembled rather than dispatched: none of the words the client
+    // reads to decide what the player's next click means are written.
+    [Fact]
+    public void LeavesTheCursorAndTheTargetGlobalsAloneWhenItCasts()
+    {
+        var code = SkillCast.Build(Packed, SkillTarget.Entity(0x8888));
+
+        foreach (var global in new uint[] { 0x00C31304, 0x00C3131C, 0x00C31308, 0x0097C910 })
+        {
+            code.AsSpan().IndexOf(BitConverter.GetBytes(global)).ShouldBe(-1);
+        }
+    }
 
     [Fact]
     public void LeavesTheClientsOwnTargetAloneWhenNoneIsNamed() =>
@@ -236,12 +289,10 @@ public sealed class GameActionTests
     // The client writes its target global as the mouse moves and reads it on the player's
     // next click. Leaving the helper's value there aims the player's next cast at whatever
     // the helper was aiming at.
-    [Theory]
-    [InlineData(SkillAim.Whatever)]
-    [InlineData(SkillAim.Entity)]
-    public void PutsTheClientsTargetBackAfterCasting(SkillAim aim)
+    [Fact]
+    public void PutsTheClientsTargetBackAfterCasting()
     {
-        var code = SkillCast.Build(Packed, new SkillTarget(aim, 0x8888));
+        var code = SkillCast.Build(Packed, SkillTarget.Whatever);
 
         // mov eax, [target] first, push it, and pop it back into [target] last.
         code[1].ShouldBe((byte)0xA1);

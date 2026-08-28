@@ -340,10 +340,6 @@ public sealed class RemoteProcess : IDisposable
         return null;
     }
 
-    /// <summary>Every match in the range.</summary>
-    public IReadOnlyList<GameAddress> ScanAll(BytePattern pattern, GameAddress start, GameAddress end) =>
-        [.. ScanCore(pattern, start, end)];
-
     private IEnumerable<GameAddress> ScanCore(BytePattern pattern, GameAddress start, GameAddress end)
     {
         ArgumentNullException.ThrowIfNull(pattern);

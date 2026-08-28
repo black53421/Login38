@@ -138,6 +138,8 @@ void PresentBits16(HWND hwnd, const void* bits, int srcPitch, int sw, int sh, bo
         SetStretchBltMode(dstDC, COLORONCOLOR);
         StretchDIBits(dstDC, 0, 0, cw, ch, 0, 0, sw, sh,
                       bits, (BITMAPINFO*)&bmi, DIB_RGB_COLORS, SRCCOPY);
+        // 遊戲畫面已經在 backbuffer 上,現在疊自己的東西 —— 同一幀、同一個座標系。
+        AtsDraw(dstDC, cw, ch);
         RECT dirty = { 0, 0, cw, ch };
         surf->ReleaseDC(&dirty);   // 必須 ReleaseDC 後才能 Present
     }

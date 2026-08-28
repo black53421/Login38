@@ -63,4 +63,50 @@ public static class ObfuscatedStat
         value = encoded ^ salt;
         return true;
     }
+
+    /// <summary>
+    /// Puts one of these back to zero.
+    /// </summary>
+    /// <returns>False when the object has not been set up, or could not be written.</returns>
+    /// <remarks>
+    /// <para>
+    /// The salt written into the slot the index already names, which decodes to zero. The
+    /// client's own setter re-salts and re-keys the whole array on every write; this does
+    /// not, because it has no need to hide anything and every extra write is another way to
+    /// disagree with a reader running at the same time.
+    /// </para>
+    /// <para>
+    /// Only worth doing to something the client will not put back itself. It exists for one
+    /// word — the mode flags — whose writer only ever ORs bits in.
+    /// </para>
+    /// </remarks>
+    public static bool TryClear(RemoteProcess process, GameAddress stat)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+
+        if (!process.TryRead<uint>(stat, out var encodedIndex)
+            || !process.TryRead<uint>(stat + KeyArrayOffset, out var keys)
+            || !process.TryRead<uint>(stat + SaltOffset, out var salt))
+        {
+            return false;
+        }
+
+        var index = encodedIndex ^ IndexKey;
+
+        if (index >= Slots || keys == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            process.Write(new GameAddress(keys) + (int)(index * sizeof(uint)), salt);
+
+            return true;
+        }
+        catch (GameProcessException)
+        {
+            return false;
+        }
+    }
 }

@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System.Diagnostics;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using Login38.Aux.Notifications;
@@ -44,9 +45,23 @@ internal sealed class OverlaySurface : FrameworkElement
     private static readonly Color GoldInk = Color.FromRgb(0xDF, 0xCD, 0x65);
 
     private readonly SpriteArtwork _artwork;
+    private readonly AtsBadge _ats = new();
+
+    /// <summary>
+    /// The clock the hunt's mark spins by.
+    /// </summary>
+    /// <remarks>
+    /// Its own, and not the board's. The board's clock only moves when the helper loop hands
+    /// a snapshot over, which is ten times a second — a two-second turn drawn in twenty steps
+    /// of eighteen degrees, which is what "the animation is not smooth" was. This one is read
+    /// afresh on every frame the compositor draws.
+    /// </remarks>
+    private readonly Stopwatch _spin = Stopwatch.StartNew();
 
     private BoardSnapshot _board;
     private TimeSpan _now;
+    private bool _hunting;
+    private bool _ticking;
 
     internal OverlaySurface(SpriteArtwork artwork)
     {
@@ -55,16 +70,44 @@ internal sealed class OverlaySurface : FrameworkElement
     }
 
     /// <summary>Hands over what to draw. Called on the interface thread.</summary>
-    internal void Show(BoardSnapshot board, TimeSpan now)
+    internal void Show(BoardSnapshot board, TimeSpan now, bool hunting)
     {
         _board = board;
         _now = now;
+        _hunting = hunting;
+
+        // Only while there is something turning. The compositor's frame event fires at the
+        // monitor's rate whatever is listening to it, so a surface that stayed subscribed
+        // would redraw a still picture sixty times a second for as long as the game is open.
+        Ticking(hunting);
 
         InvalidateVisual();
     }
 
-    /// <summary>Whether the last snapshot handed over had anything in it.</summary>
-    internal bool HasAnythingToDraw => !_board.IsEmpty;
+    /// <summary>Stops asking for frames, for a surface nobody is looking at.</summary>
+    internal void Rest() => Ticking(false);
+
+    /// <summary>Starts or stops redrawing with the compositor.</summary>
+    private void Ticking(bool wanted)
+    {
+        if (wanted == _ticking)
+        {
+            return;
+        }
+
+        _ticking = wanted;
+
+        if (wanted)
+        {
+            CompositionTarget.Rendering += Frame;
+        }
+        else
+        {
+            CompositionTarget.Rendering -= Frame;
+        }
+    }
+
+    private void Frame(object? sender, EventArgs e) => InvalidateVisual();
 
     protected override void OnRender(DrawingContext drawing)
     {
@@ -76,6 +119,14 @@ internal sealed class OverlaySurface : FrameworkElement
         if (width <= 0 || height <= 0)
         {
             return;
+        }
+
+        // Under everything else. It sits in the middle of the picture and the toasts sit
+        // at its edges, so they do not overlap — but a mark that covered a pickup would be
+        // the wrong way round, since the mark says something the player already knows.
+        if (_hunting)
+        {
+            _ats.Draw(drawing, width, height, _spin.Elapsed);
         }
 
         for (var slot = 0; slot < _board.Toasts.Count; slot++)

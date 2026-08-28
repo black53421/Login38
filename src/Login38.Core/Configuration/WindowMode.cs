@@ -40,13 +40,6 @@ public static class WindowModeExtensions
         _ => Default.ToResolution(),
     };
 
-    /// <summary>
-    /// Interprets a raw config value, falling back to <see cref="Default"/> for anything
-    /// outside the four supported sizes.
-    /// </summary>
-    public static WindowMode ToWindowModeOrDefault(this byte raw) =>
-        Enum.IsDefined((WindowMode)raw) ? (WindowMode)raw : Default;
-
     /// <summary>Interprets a raw config value, or null if it is not a supported size.</summary>
     public static WindowMode? ToWindowMode(this byte raw) =>
         Enum.IsDefined((WindowMode)raw) ? (WindowMode)raw : null;

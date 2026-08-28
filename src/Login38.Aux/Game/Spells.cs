@@ -7,9 +7,8 @@ namespace Login38.Aux.Game;
 
 /// <summary>One skill, as the client knows it.</summary>
 /// <param name="Packed">The id that goes into a cast packet.</param>
-/// <param name="Range">How far it reaches, in tiles. Zero for anything cast on oneself.</param>
 /// <param name="Handler">Which of the client's casting handlers it goes through.</param>
-public readonly record struct Spell(uint Packed, uint Range, byte Handler)
+public readonly record struct Spell(uint Packed, byte Handler, GameAddress Record = default)
 {
     /// <summary>Whether casting this does something to a target rather than to the caster.</summary>
     /// <remarks>
@@ -106,6 +105,36 @@ public class Spells
     public int Learned => _book.Count;
 
     /// <summary>
+    /// Where a skill's own record is, if it is still that skill's record.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The record holds the three fields that grey a skill's icon out while it cools, and
+    /// they are the one part of casting that cannot be written by skill id: the client finds
+    /// the record by walking the book. Walking it again inside a piece of assembled code is
+    /// possible and not worth it, so the address the book was read at is used instead.
+    /// </para>
+    /// <para>
+    /// Which is only safe because of the check. A book read before a level, a relog or a
+    /// character change points at memory that has been given back, and writing into it would
+    /// be a fault in the client rather than a wrong icon. The record's own id says whether it
+    /// is still the record it was; when it does not, the icon is left alone and everything
+    /// else about the cast goes ahead.
+    /// </para>
+    /// </remarks>
+    /// <returns>The record, or <see cref="GameAddress.Zero"/> when it cannot be trusted.</returns>
+    public virtual GameAddress Icon(RemoteProcess process, Spell spell)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+
+        return !spell.Record.IsNull
+            && process.TryRead<uint>(spell.Record + RecordPacked, out var packed)
+            && packed == spell.Packed
+                ? spell.Record
+                : GameAddress.Zero;
+    }
+
+    /// <summary>
     /// Finds the id to cast a skill by, given the name the player wrote.
     /// </summary>
     /// <remarks>
@@ -139,8 +168,29 @@ public class Spells
     }
 
     /// <summary>Every skill the character has learned that acts on a target.</summary>
+    /// <remarks>
+    /// As last read. <see cref="Attacks"/> is the one to ask when the answer has to be
+    /// current, which from anywhere holding a process it is.
+    /// </remarks>
     public IEnumerable<string> AttackNames =>
         _book.Where(pair => pair.Value.IsAttack).Select(pair => pair.Key);
+
+    /// <summary>
+    /// The same, after making sure the book belongs to the character in front of us.
+    /// </summary>
+    /// <remarks>
+    /// The refresh is a read of the client's pointer to the book and nothing else until that
+    /// pointer moves, which is what happens when the player changes character. Cheap enough
+    /// to call on a loop; see <c>SpellTask</c>, which does.
+    /// </remarks>
+    public virtual IReadOnlyList<string> Attacks(RemoteProcess process)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+
+        Refresh(process);
+
+        return [.. AttackNames];
+    }
 
     /// <summary>Names close to one that was not found, for a player who has mistyped.</summary>
     public IEnumerable<string> Near(string name)
@@ -225,8 +275,8 @@ public class Spells
 
                 var spell = new Spell(
                     packed,
-                    SpellNames.RangeFrom(full) ?? 0,
-                    packed < handlers.Length ? handlers[packed] : (byte)0);
+                    packed < handlers.Length ? handlers[packed] : (byte)0,
+                    new GameAddress(record));
 
                 // The same skill appears once per level learned. The highest id is the
                 // highest level, which is the one the player means.

@@ -31,6 +31,8 @@ public sealed partial class HelperViewModel : ObservableObject, IDisposable
     private readonly AuxSettingsSource _settings;
     private readonly ItemCatalog _catalog;
     private readonly InventoryWatch? _bag;
+    private readonly SpellWatch? _spells;
+    private readonly HuntSwitch? _hunting;
     private readonly TimerTask? _timers;
     private readonly Action<Action> _post;
 
@@ -57,16 +59,32 @@ public sealed partial class HelperViewModel : ObservableObject, IDisposable
         ItemCatalog catalog,
         InventoryWatch? bag = null,
         TimerTask? timers = null,
-        Action<Action>? post = null)
+        SpellWatch? spells = null,
+        HuntSwitch? hunting = null,
+        Action<Action>? post = null,
+        bool huntingOffered = true)
     {
         ArgumentNullException.ThrowIfNull(settings);
         ArgumentNullException.ThrowIfNull(catalog);
+
+        HuntingOffered = huntingOffered;
 
         _settings = settings;
         _catalog = catalog;
         _bag = bag;
         _timers = timers;
+        _spells = spells;
+        _hunting = hunting;
         _post = post ?? (work => work());
+
+        // Asked for from here rather than from a checkbox, because unlike the bag there is
+        // nothing to weigh up: the loop reads one pointer a second and rebuilds only when the
+        // player has changed character. The window is made once per game and hidden rather
+        // than closed, so this stays on for as long as the game does.
+        if (_spells is not null)
+        {
+            _spells.Wanted = true;
+        }
 
         Potions = [.. Enumerable.Range(0, AuxSettings.PotionRows).Select(_ => new PotionRowViewModel())];
         Macros = [.. Enumerable.Range(1, AuxSettings.FunctionKeyMacros).Select(key => new MacroViewModel(key))];
@@ -173,6 +191,17 @@ public sealed partial class HelperViewModel : ObservableObject, IDisposable
     /// <summary>What is in the bag, for picking something to get rid of.</summary>
     public ObservableCollection<string> BagChoices { get; } = [];
 
+    /// <summary>
+    /// What this character has learned that acts on a target, for the rotation.
+    /// </summary>
+    /// <remarks>
+    /// Typed names were the only way to fill a rotation row before this, and a mistyped one
+    /// is silent: the hunt says once in the log that the character never learned it and then
+    /// gets on with the rest of the list. The box stays editable so a name the client spells
+    /// differently can still be written by hand.
+    /// </remarks>
+    public ObservableCollection<string> SkillChoices { get; } = [];
+
     // ---- 喊話 -------------------------------------------------------------------------
 
     [ObservableProperty]
@@ -184,6 +213,21 @@ public sealed partial class HelperViewModel : ObservableObject, IDisposable
 
     /// <summary>What to say, one per interval, in turn.</summary>
     public ChoiceListViewModel Shout { get; } = new();
+
+    // ---- 狩獵 -------------------------------------------------------------------------
+
+    /// <summary>What to attack, and when to stop trying.</summary>
+    public HuntViewModel Hunt { get; } = new();
+
+    /// <summary>
+    /// Whether this build offers automatic hunting, which decides if its page is there.
+    /// </summary>
+    /// <remarks>
+    /// The operator's switch, from the server list rather than from anything the player can
+    /// reach — see <c>AuxConfig.InternalBotEnabled</c>. Fixed for the life of the window,
+    /// which is why nothing raises a change for it.
+    /// </remarks>
+    public bool HuntingOffered { get; }
 
     // ---- 其他 -------------------------------------------------------------------------
 
@@ -293,6 +337,7 @@ public sealed partial class HelperViewModel : ObservableObject, IDisposable
                 HelperNumbers.LongestInterval);
             Shout.Load(settings.ShoutMessages);
 
+            Hunt.Load(settings.Hunt);
             Misc.Load(settings.Misc);
 
             TimersEnabled = settings.TimersEnabled;
@@ -349,6 +394,10 @@ public sealed partial class HelperViewModel : ObservableObject, IDisposable
             ShoutIntervalSeconds, HelperNumbers.ShortestInterval, HelperNumbers.LongestInterval),
         ShoutMessages = [.. Shout.Items],
 
+        // Off rather than as last saved, when the operator has not offered it. A settings
+        // file written on a build that did would otherwise leave the character hunting with
+        // no page to say so and no way to stop it.
+        Hunt = HuntingOffered ? Hunt.ToSettings() : Hunt.ToSettings().Off(),
         Misc = Misc.ToToggles(),
 
         TimersEnabled = TimersEnabled,
@@ -401,9 +450,20 @@ public sealed partial class HelperViewModel : ObservableObject, IDisposable
     /// </remarks>
     public void RefreshInventory()
     {
+        // A task has read an escape scroll and turned the hunt off in the settings. The
+        // checkbox has to follow, and not because it looks untidy: this window writes the
+        // whole of its state back whenever anything on it changes, so a tick left standing
+        // here starts the character hunting again the next time its owner adjusts a potion
+        // row — at the worst possible moment, since the reason it stopped was low health.
+        if (_hunting?.Taken() == true)
+        {
+            Hunt.Enabled = false;
+        }
+
         var bag = _bag?.Names ?? [];
 
         Sync(BagChoices, bag);
+        Sync(SkillChoices, _spells?.Names ?? []);
         Sync(HealingChoices, ShowInventory
             ? _catalog.Offer(ItemCatalog.Healing).Concat(bag)
             : _catalog.Offer(ItemCatalog.Healing));
@@ -427,10 +487,21 @@ public sealed partial class HelperViewModel : ObservableObject, IDisposable
     }
 
     /// <summary>Everything that is a change to the settings when the player touches it.</summary>
+    /// <remarks>
+    /// The rotation's rows were missing from here, and a row is its own object — so filling one
+    /// in raised nothing anything was listening to, nothing was published, and the hunt went on
+    /// with whatever was saved before. From the window it looked entirely done: the name was in
+    /// the box and stayed there. The only way to make a skill take was to touch some other
+    /// setting afterwards and have it carry the row along.
+    /// </remarks>
     private IEnumerable<INotifyPropertyChanged> Parts() =>
-        [this, Mana, Misc, .. Potions, .. Macros, .. Timers, Buffs, Delete, Dissolve, Shout];
+    [
+        this, Mana, Misc, Hunt, .. Potions, .. Macros, .. Timers, .. Hunt.Skills,
+        Buffs, Delete, Dissolve, Shout, Hunt.Blacklist, Hunt.Whitelist,
+    ];
 
-    private IEnumerable<ChoiceListViewModel> Lists() => [Buffs, Delete, Dissolve, Shout];
+    private IEnumerable<ChoiceListViewModel> Lists() =>
+        [Buffs, Delete, Dissolve, Shout, Hunt.Blacklist, Hunt.Whitelist];
 
     private void OnListChanged(object? sender, NotifyCollectionChangedEventArgs e) => Apply();
 

@@ -243,7 +243,8 @@ public sealed class HelperDispatchTests : IDisposable
         public override void UseOn(RemoteProcess process, uint source, uint target) =>
             _pairs.Add((source, target));
 
-        public override void Cast(RemoteProcess process, uint packed, SkillTarget target)
+        public override void Cast(
+            RemoteProcess process, uint packed, SkillTarget target, GameAddress record = default)
         {
             _casts.Add((packed, target.Aim));
             _castTargets.Add(target.Id);

@@ -45,36 +45,17 @@ public static class RemoteCall
         {
             process.WriteBytes(page, code);
 
-            using var thread = Kernel32.CreateRemoteThread(
-                process.Handle, 0, 0, page.ToPointer(), 0, 0, out var threadId);
+            return RunAt(process, page, timeout);
+        }
+        catch (RemoteCodeStillRunningException e)
+        {
+            // The thread is still somewhere in this page. Freeing it now would unmap the
+            // code out from under it, which is a crash of the game rather than a failure of
+            // the launcher. A leaked page is the cheaper mistake.
+            release = false;
 
-            if (thread.IsInvalid)
-            {
-                throw RemoteProcess.Failure($"CreateRemoteThread({page})");
-            }
-
-            var wait = Kernel32.WaitForSingleObject(thread, (uint)timeout.TotalMilliseconds);
-
-            if (wait == WaitResult.Timeout)
-            {
-                // The thread is still somewhere in this page. Freeing it now would unmap
-                // the code out from under it, which is a crash of the game rather than a
-                // failure of the launcher. A leaked page is the cheaper mistake.
-                release = false;
-
-                throw new GameProcessException(
-                    $"Code at {page} did not return within {timeout.TotalSeconds:0}s (thread {threadId}); " +
-                    "its page has been left mapped.");
-            }
-
-            if (wait != WaitResult.Object0)
-            {
-                throw new GameProcessException($"Waiting on thread {threadId} at {page} gave {wait}.");
-            }
-
-            return Kernel32.GetExitCodeThread(thread, out var exitCode)
-                ? exitCode
-                : throw RemoteProcess.Failure($"GetExitCodeThread({threadId})");
+            throw new RemoteCodeStillRunningException(
+                $"{e.Message} Its page has been left mapped.");
         }
         finally
         {
@@ -84,4 +65,55 @@ public static class RemoteCall
             }
         }
     }
+
+    /// <summary>
+    /// Runs code that is already in the game on a thread of its own and waits for it.
+    /// </summary>
+    /// <returns>The thread's exit code, which is whatever the code left in <c>eax</c>.</returns>
+    /// <remarks>
+    /// For a page the caller keeps, which is what anything asked more than once wants: the
+    /// allocation and the writing of the code are most of the cost of <see cref="Run"/>, and
+    /// repeating them per question would swamp the question.
+    /// </remarks>
+    /// <exception cref="RemoteCodeStillRunningException">It did not return in time.</exception>
+    /// <exception cref="GameProcessException">The thread could not be started or waited on.</exception>
+    public static uint RunAt(RemoteProcess process, GameAddress entry, TimeSpan timeout)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+
+        using var thread = Kernel32.CreateRemoteThread(
+            process.Handle, 0, 0, entry.ToPointer(), 0, 0, out var threadId);
+
+        if (thread.IsInvalid)
+        {
+            throw RemoteProcess.Failure($"CreateRemoteThread({entry})");
+        }
+
+        var wait = Kernel32.WaitForSingleObject(thread, (uint)timeout.TotalMilliseconds);
+
+        if (wait == WaitResult.Timeout)
+        {
+            throw new RemoteCodeStillRunningException(
+                $"Code at {entry} did not return within {timeout.TotalSeconds:0}s (thread {threadId}).");
+        }
+
+        if (wait != WaitResult.Object0)
+        {
+            throw new GameProcessException($"Waiting on thread {threadId} at {entry} gave {wait}.");
+        }
+
+        return Kernel32.GetExitCodeThread(thread, out var exitCode)
+            ? exitCode
+            : throw RemoteProcess.Failure($"GetExitCodeThread({threadId})");
+    }
 }
+
+/// <summary>
+/// Code run inside the game had not returned when the wait ran out.
+/// </summary>
+/// <remarks>
+/// Its own type because the only safe response is different from every other failure: the
+/// thread is still inside that page, so the page cannot be freed, and whatever the page
+/// holds cannot be written to again. Callers that keep a page have to retire it.
+/// </remarks>
+public sealed class RemoteCodeStillRunningException(string message) : GameProcessException(message);

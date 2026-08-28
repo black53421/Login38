@@ -34,6 +34,8 @@ public sealed class AuxSession : IDisposable
         Host = _scope.ServiceProvider.GetRequiredService<AuxHost>();
         Settings = _scope.ServiceProvider.GetRequiredService<AuxSettingsSource>();
         Inventory = _scope.ServiceProvider.GetRequiredService<InventoryWatch>();
+        Spells = _scope.ServiceProvider.GetRequiredService<SpellWatch>();
+        Hunting = _scope.ServiceProvider.GetRequiredService<HuntSwitch>();
         Timers = _scope.ServiceProvider.GetRequiredService<TimerTask>();
         Keys = _scope.ServiceProvider.GetRequiredService<HelperKeyTask>();
     }
@@ -52,6 +54,18 @@ public sealed class AuxSession : IDisposable
 
     /// <summary>What is in this character's bag, for the window's dropdowns.</summary>
     public InventoryWatch Inventory { get; }
+
+    /// <summary>What this character has learned, for the rotation's dropdown.</summary>
+    /// <remarks>
+    /// Per game like the rest. Two clients are two characters with two spell books, and a
+    /// list shared between them offers each of them the other one's skills.
+    /// </remarks>
+    public SpellWatch Spells { get; }
+
+    /// <summary>
+    /// How a task says it has turned the hunt off, for the window that draws the switch.
+    /// </summary>
+    public HuntSwitch Hunting { get; }
 
     /// <summary>
     /// The timers, so the window's per-row button can start one of them counting again.

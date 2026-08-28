@@ -167,9 +167,6 @@ public sealed class ShellcodeBuilder
     /// <summary><c>mov al, byte ptr [address]</c>.</summary>
     public ShellcodeBuilder MovAlFrom(GameAddress address) => Byte(0xA0).Dword(address.Value);
 
-    /// <summary><c>mov byte ptr [address], al</c>.</summary>
-    public ShellcodeBuilder MovAlTo(GameAddress address) => Byte(0xA2).Dword(address.Value);
-
     /// <summary><c>mov eax, dword ptr [address]</c>.</summary>
     public ShellcodeBuilder MovEaxFrom(GameAddress address) => Byte(0xA1).Dword(address.Value);
 
@@ -184,6 +181,13 @@ public sealed class ShellcodeBuilder
     public ShellcodeBuilder MovsxEdxByteFrom(GameAddress address) =>
         Bytes([0x0F, 0xBE, 0x15]).Dword(address.Value);
 
+    /// <summary><c>movsx edx, word ptr [address]</c> — a signed word widened to a dword.</summary>
+    public ShellcodeBuilder MovsxEdxWordFrom(GameAddress address) =>
+        Bytes([0x0F, 0xBF, 0x15]).Dword(address.Value);
+
+    /// <summary><c>add eax, edx</c>.</summary>
+    public ShellcodeBuilder AddEaxEdx() => Bytes([0x03, 0xC2]);
+
     /// <summary><c>push eax</c>.</summary>
     public ShellcodeBuilder PushEax() => Byte(0x50);
 
@@ -195,6 +199,40 @@ public sealed class ShellcodeBuilder
 
     /// <summary><c>mov ecx, dword ptr [address]</c> — the <c>this</c> of a thiscall.</summary>
     public ShellcodeBuilder MovEcxFrom(GameAddress address) => Bytes([0x8B, 0x0D]).Dword(address.Value);
+
+    /// <summary><c>push ecx</c>.</summary>
+    public ShellcodeBuilder PushEcx() => Byte(0x51);
+
+    /// <summary><c>pop ecx</c>.</summary>
+    public ShellcodeBuilder PopEcx() => Byte(0x59);
+
+    /// <summary><c>mov ecx, dword ptr [eax]</c> — the first field of whatever eax points at.</summary>
+    /// <remarks>
+    /// For a C++ object that is its vtable, which is the cheapest test there is for "does
+    /// this pointer still point at what it used to".
+    /// </remarks>
+    public ShellcodeBuilder MovEcxFromEax() => Bytes([0x8B, 0x08]);
+
+    /// <summary><c>cmp ecx, imm32</c>.</summary>
+    public ShellcodeBuilder CmpEcx(uint value) => Bytes([0x81, 0xF9]).Dword(value);
+
+    /// <summary><c>mov eax, dword ptr [ecx+displacement]</c> — a field of the object in ecx.</summary>
+    public ShellcodeBuilder MovEaxFromEcx(byte displacement = 0) =>
+        displacement == 0 ? Bytes([0x8B, 0x01]) : Bytes([0x8B, 0x41, displacement]);
+
+    /// <summary><c>mov dword ptr [ecx], eax</c>.</summary>
+    public ShellcodeBuilder MovEcxPtrFromEax() => Bytes([0x89, 0x01]);
+
+    /// <summary><c>add eax, imm32</c>.</summary>
+    public ShellcodeBuilder AddEax(uint value) => Byte(0x05).Dword(value);
+
+    /// <summary><c>cmp byte ptr [eax+displacement], imm8</c>.</summary>
+    /// <remarks>
+    /// A field of an object in hand, without loading it into anything. The one-byte
+    /// displacement form covers any offset a record of a few hundred bytes has.
+    /// </remarks>
+    public ShellcodeBuilder CmpBytePtrEax(byte displacement, byte value) =>
+        Bytes([0x80, 0x78, displacement, value]);
 
     /// <summary>
     /// <c>lea eax, [esi+displacement]</c> — an address relative to one already in hand.

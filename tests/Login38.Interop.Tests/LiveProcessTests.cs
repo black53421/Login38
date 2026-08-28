@@ -226,30 +226,46 @@ public sealed partial class LiveProcessTests
     // The one transition a player is looking straight at. The first version of this polled
     // every 250 ms, so the launcher spent up to a quarter of a second after the game had
     // gone still believing it was there.
+    //
+    // Several readings, and the middle one. What is being timed here is not really the wait
+    // — that returns in about a millisecond — but the continuation behind it, which is
+    // queued on a thread pool shared with every other test running at the same time. This
+    // test took one reading and bounded it at 100 ms until it went red on a machine running
+    // six test assemblies at once, with the comment above the bound claiming it was loose
+    // enough not to. A poll would be late every time; contention is late occasionally, so
+    // the median tells the two apart and one slow reading cannot move it.
     [Fact]
     public async Task NoticesAnExitWithoutWaitingForAPoll()
     {
-        using var child = System.Diagnostics.Process.Start(
-            new System.Diagnostics.ProcessStartInfo("cmd.exe", "/c pause")
-            { CreateNoWindow = true, UseShellExecute = false, RedirectStandardInput = true })!;
+        var readings = new List<TimeSpan>();
 
-        using var process = RemoteProcess.Open((uint)child.Id);
+        for (var reading = 0; reading < 5; reading++)
+        {
+            using var child = System.Diagnostics.Process.Start(
+                new System.Diagnostics.ProcessStartInfo("cmd.exe", "/c pause")
+                { CreateNoWindow = true, UseShellExecute = false, RedirectStandardInput = true })!;
 
-        var waiting = process.WaitForExitAsync();
+            using var process = RemoteProcess.Open((uint)child.Id);
 
-        waiting.IsCompleted.ShouldBeFalse("it returned before the process had gone anywhere");
+            var waiting = process.WaitForExitAsync();
 
-        var started = System.Diagnostics.Stopwatch.StartNew();
-        child.Kill();
+            waiting.IsCompleted.ShouldBeFalse("it returned before the process had gone anywhere");
 
-        await waiting.WaitAsync(TimeSpan.FromSeconds(5));
+            var started = System.Diagnostics.Stopwatch.StartNew();
+            child.Kill();
 
-        // A wait returns in single-digit milliseconds. This is loose enough not to fail on a
-        // busy machine and tight enough that a quarter-second poll would usually miss it,
-        // which is the regression it is here for.
-        started.Elapsed.ShouldBeLessThan(
+            await waiting.WaitAsync(TimeSpan.FromSeconds(5));
+
+            readings.Add(started.Elapsed);
+        }
+
+        readings.Sort();
+
+        var taken = string.Join(", ", readings.Select(reading => $"{reading.TotalMilliseconds:F0} ms"));
+
+        readings[readings.Count / 2].ShouldBeLessThan(
             TimeSpan.FromMilliseconds(100),
-            $"it took {started.ElapsedMilliseconds} ms to notice, which is a poll rather than a wait");
+            $"the middle of {taken} is a poll rather than a wait");
     }
 
     [Fact]

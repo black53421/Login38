@@ -240,6 +240,7 @@ static DWORD WINAPI Worker(LPVOID)
             Sleep(200);
             BYTE fs = *(volatile BYTE*)gaddr::FULLSCREEN_FLAG;
             Log("ddraw 就緒:primary=0x%p fullscreen=%d", prim, (int)fs);
+            AtsPublish();
             InstallRenderHooks();
             InstallImeRouting();
             // message loop:WinEvent OUTOFCONTEXT callback 派發到本 thread 的訊息佇列

@@ -78,7 +78,10 @@ public sealed class HelperWindows : IHelperWindows
             _catalog,
             session.Helper.Inventory,
             session.Helper.Timers,
-            work => dispatcher?.BeginInvoke(work));
+            session.Helper.Spells,
+            session.Helper.Hunting,
+            work => dispatcher?.BeginInvoke(work),
+            session.HuntingOffered);
 
         var window = new HelperWindow(helper) { Owner = Application.Current?.MainWindow };
 

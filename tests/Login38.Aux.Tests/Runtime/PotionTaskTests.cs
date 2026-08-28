@@ -319,7 +319,8 @@ public sealed class PotionTaskTests : IDisposable
 
         public override void SendUseItem(RemoteProcess process, uint itemId) => _used.Add(itemId);
 
-        public override void Cast(RemoteProcess process, uint packed, SkillTarget target) =>
+        public override void Cast(
+            RemoteProcess process, uint packed, SkillTarget target, GameAddress record = default) =>
             _cast.Add((packed, target.Aim));
     }
 

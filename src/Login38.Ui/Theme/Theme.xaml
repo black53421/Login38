@@ -97,6 +97,23 @@
         <Setter Property="Margin" Value="0,0,0,8" />
     </Style>
 
+    <!--
+        The settings that are set once and then left alone are shown in one of these rather
+        than crowded onto the page beside the switches that get touched every session.
+
+        Left at the library's template and given this palette's surfaces. Its own default is
+        the light one, and a dialog is the one part of the window that is drawn over
+        everything else — getting it wrong is a white sheet across a black window.
+    -->
+    <Style x:Key="Library.ContentDialog" TargetType="ui:ContentDialog"
+           BasedOn="{StaticResource {x:Type ui:ContentDialog}}">
+        <Setter Property="Background" Value="{StaticResource Surface.Raised}" />
+        <Setter Property="Foreground" Value="{StaticResource Text.Primary}" />
+        <Setter Property="BorderBrush" Value="{StaticResource Line.Strong}" />
+        <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Size.Body}" />
+    </Style>
+
     <Style x:Key="Library.InfoBar" TargetType="ui:InfoBar" BasedOn="{StaticResource {x:Type ui:InfoBar}}">
         <Setter Property="FontFamily" Value="{StaticResource Font.Ui}" />
         <Setter Property="FontSize" Value="{StaticResource Size.Label}" />
