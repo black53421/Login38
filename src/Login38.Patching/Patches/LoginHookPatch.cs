@@ -11,8 +11,9 @@ namespace Login38.Patching.Patches;
 /// <para>
 /// The client's own login path sends a packet shape that most emulators do not accept.
 /// The widely used legacy <c>Login.dll</c> instead hooks the native login point and
-/// sends opcode <c>0x77</c> with the compact <c>"cssddddddd"</c> argument list. This
-/// reproduces that, which is what makes the launcher work against those servers.
+/// sends a custom opcode <c>0x77</c> packet. L1J-TW 3.80c instead expects the
+/// Beanfun login opcode followed by action <c>0x06</c>, account and password. This
+/// patch emits the L1J-TW packet shape directly through the client native send routine.
 /// </para>
 /// <para>Three hooks, all pointing into one code cave:</para>
 /// <list type="bullet">
@@ -89,20 +90,17 @@ public sealed class LoginHookPatch : IGamePatch
     private const uint AccountBufferLength = 32;
 
     /// <summary>
-    /// The <c>SendPacketData</c> argument descriptor: a char, two strings, then seven
-    /// dwords.
+    /// The <c>SendPacketData</c> argument descriptor: opcode, action, account and password.
     /// </summary>
-    private static ReadOnlySpan<byte> FormatString => "cssddddddd\0"u8;
+    private static ReadOnlySpan<byte> FormatString => "ccss\0"u8;
 
-    private const uint LoginOpcode = 0x77;
+    /// <summary>L1J-TW 3.80c Beanfun login opcode.</summary>
+    private const uint LoginOpcode = 0xD2;
 
-    /// <summary>127.0.0.1 in network byte order, as the packet expects.</summary>
-    private const uint LoopbackAddress = 0x0100_007F;
+    /// <summary>L1J-TW 3.80c authentication action consumed by C_AuthLogin.</summary>
+    private const uint LoginAction = 0x06;
 
-    /// <summary>Trailing constant the legacy client sends; meaning not established.</summary>
-    private const uint TrailingFlag = 0x1F;
-
-    private const int SendArgumentCount = 11;
+    private const int SendArgumentCount = 5;
 
     private readonly ILogger<LoginHookPatch> _logger;
 
@@ -266,16 +264,10 @@ public sealed class LoginHookPatch : IGamePatch
     {
         var code = new ShellcodeBuilder(cave + SendCodeOffset);
 
-        // SendPacketData("cssddddddd", 0x77, account, password, 127.0.0.1, 0,0,0,0,0, 0x1F)
-        code.PushImm32(TrailingFlag)
-            .PushImm32(0)
-            .PushImm32(0)
-            .PushImm32(0)
-            .PushImm32(0)
-            .PushImm32(0)
-            .PushImm32(LoopbackAddress)
-            .PushImm32(cave + PasswordBufferOffset)
+        // SendPacketData("ccss", 0xD2, 0x06, account, password)
+        code.PushImm32(cave + PasswordBufferOffset)
             .PushImm32(cave + AccountBufferOffset)
+            .PushImm32(LoginAction)
             .PushImm32(LoginOpcode)
             .PushImm32(cave + FormatStringOffset)
             .CallTo(SendPacketData)

@@ -36,10 +36,8 @@ public sealed class LoginHookByteCompatibilityTests
         "80 00 00 10 33 C0 AB AB AB AB AB AB AB AB 5F 58 BA 80 00 00 10 88 04 0A 41 89 0D 00 " +
         "01 00 10 61 E9 D4 A1 4A F0";
 
-    private const string ExpectedSendPacket =
-        "68 1F 00 00 00 68 00 00 00 00 68 00 00 00 00 68 00 00 00 00 68 00 00 00 00 68 00 00 " +
-        "00 00 68 7F 00 00 01 68 80 00 00 10 68 00 00 00 10 68 77 00 00 00 68 10 01 00 10 E8 " +
-        "94 0B 58 F0 83 C4 2C C7 05 00 01 00 10 00 00 00 00 E9 A9 2B 77 F0";
+    // The L1J-TW login packet intentionally differs from the historical Login.dll
+    // reference, so only the capture hooks remain byte-for-byte compatible.
 
     [Fact]
     public void AccountCaptureMatchesTheReferenceByteForByte() =>
@@ -48,10 +46,6 @@ public sealed class LoginHookByteCompatibilityTests
     [Fact]
     public void PasswordCaptureMatchesTheReferenceByteForByte() =>
         LoginHookPatch.BuildPasswordCapture(Cave).ShouldBe(Parse(ExpectedPasswordCapture));
-
-    [Fact]
-    public void SendPacketMatchesTheReferenceByteForByte() =>
-        LoginHookPatch.BuildSendPacket(Cave).ShouldBe(Parse(ExpectedSendPacket));
 
     /// <summary>
     /// The reference hardcoded this branch as <c>75 13</c>. Here it is computed from the

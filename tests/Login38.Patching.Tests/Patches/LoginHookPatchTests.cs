@@ -24,28 +24,26 @@ public sealed class LoginHookPatchTests
     private const uint SendCodeAddress = 0x1000_0280;
 
     private const uint SendPacketData = 0x0058_0E50;
-    private const uint LoginOpcode = 0x77;
+    private const uint LoginOpcode = 0xD2;
+    private const uint LoginAction = 0x06;
 
     // The order these are pushed decides which string the server reads as the account.
     // Getting it backwards sends the password as the login name, in plain text.
     [Fact]
-    public void SendPacketPushesTheFormatOpcodeAccountThenPassword()
+    public void SendPacketPushesTheL1jTwLoginArguments()
     {
         var arguments = ReadCdeclArguments(LoginHookPatch.BuildSendPacket(Cave));
 
         arguments[0].ShouldBe(FormatStringAddress);
         arguments[1].ShouldBe(LoginOpcode);
-        arguments[2].ShouldBe(AccountBufferAddress);
-        arguments[3].ShouldBe(PasswordBufferAddress);
+        arguments[2].ShouldBe(LoginAction);
+        arguments[3].ShouldBe(AccountBufferAddress);
+        arguments[4].ShouldBe(PasswordBufferAddress);
     }
 
     [Fact]
-    public void SendPacketPassesElevenArguments() =>
-        ReadCdeclArguments(LoginHookPatch.BuildSendPacket(Cave)).Length.ShouldBe(11);
-
-    [Fact]
-    public void SendPacketAddressesTheLoopbackInNetworkByteOrder() =>
-        ReadCdeclArguments(LoginHookPatch.BuildSendPacket(Cave))[4].ShouldBe(0x0100_007Fu);
+    public void SendPacketPassesFiveArguments() =>
+        ReadCdeclArguments(LoginHookPatch.BuildSendPacket(Cave)).Length.ShouldBe(5);
 
     [Fact]
     public void SendPacketCallsTheClientsSendRoutine()
