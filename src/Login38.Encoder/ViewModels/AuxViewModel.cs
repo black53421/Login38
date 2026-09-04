@@ -114,10 +114,10 @@ public sealed partial class AuxViewModel : ObservableObject
     private bool _helper = true;
 
     [ObservableProperty]
-    private bool _hitPointLimit = true;
+    private bool _hitPointLimit = false;
 
     [ObservableProperty]
-    private bool _armourLimit = true;
+    private bool _armourLimit = false;
 
     [ObservableProperty]
     private bool _inventoryLimit = true;
@@ -135,7 +135,7 @@ public sealed partial class AuxViewModel : ObservableObject
     private double _imageSize = AuxConfig.ImgLimitBounds.Default;
 
     [ObservableProperty]
-    private bool _dynamicDialog = true;
+    private bool _dynamicDialog = false;
 
     [ObservableProperty]
     private bool _dynamicIcons;
@@ -144,10 +144,10 @@ public sealed partial class AuxViewModel : ObservableObject
     private string _iconPackageName = "123";
 
     [ObservableProperty]
-    private bool _pickupToast = true;
+    private bool _pickupToast = false;
 
     [ObservableProperty]
-    private bool _gainDrift = true;
+    private bool _gainDrift = false;
 
     [ObservableProperty]
     private bool _internalBot;

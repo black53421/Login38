@@ -65,10 +65,10 @@ public sealed class AuxConfig
     public bool LhxAuxEnabled { get; set; } = true;
 
     /// <summary>Raise the HP/MP display ceiling past the client's byte limit.</summary>
-    public bool HpMpLimitEnabled { get; set; } = true;
+    public bool HpMpLimitEnabled { get; set; }
 
     /// <summary>Raise the AC/MR display ceiling past the client's byte limit.</summary>
-    public bool AcMrLimitEnabled { get; set; } = true;
+    public bool AcMrLimitEnabled { get; set; }
 
     public bool InventoryLimitEnabled { get; set; } = true;
 
@@ -77,16 +77,16 @@ public sealed class AuxConfig
 
     public bool ImgLimitEnabled { get; set; } = true;
 
-    public bool DynamicDialogEnabled { get; set; } = true;
+    public bool DynamicDialogEnabled { get; set; }
 
     /// <summary>Animated item icons from a custom PNG <c>.pak</c>.</summary>
     public bool DynamicIconEnabled { get; set; }
 
     /// <summary>Pickup notifications in the lower-left corner.</summary>
-    public bool PickupToastEnabled { get; set; } = true;
+    public bool PickupToastEnabled { get; set; }
 
     /// <summary>Floating experience and coin text.</summary>
-    public bool ExpDriftEnabled { get; set; } = true;
+    public bool ExpDriftEnabled { get; set; }
 
     /// <summary>
     /// Whether the helper offers automatic hunting at all.

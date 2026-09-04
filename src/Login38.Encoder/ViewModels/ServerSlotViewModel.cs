@@ -15,7 +15,7 @@ namespace Login38.Encoder.ViewModels;
 public sealed partial class ServerSlotViewModel : ObservableObject
 {
     /// <summary>The port a Lineage server listens on unless told otherwise.</summary>
-    public const int DefaultPort = 7001;
+    public const int DefaultPort = 2000;
 
     /// <param name="slot">Which of the eight this is, counted from zero.</param>
     public ServerSlotViewModel(int slot)
