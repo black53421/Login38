@@ -29,7 +29,7 @@ namespace Login38.Aux.Hunt;
 /// first to send the same potion.
 /// </para>
 /// </remarks>
-public sealed class HuntTask : IAuxTask, IAuxTaskShutdown
+public sealed class HuntTask : IAuxTask, IAuxTaskShutdown, IAuxTaskSwitchOff
 {
     /// <summary>
     /// How long the client may do nothing before the walk is started again.
@@ -294,6 +294,7 @@ public sealed class HuntTask : IAuxTask, IAuxTaskShutdown
     /// <summary>The client's own reach, as settled this pass.</summary>
     private int _swing = WeaponReach.Default;
     private RemoteProcess? _process;
+    private bool _active;
 
     public HuntTask(
         TargetScan scan,
@@ -341,7 +342,14 @@ public sealed class HuntTask : IAuxTask, IAuxTaskShutdown
 
         if (!settings.Enabled || !context.IsInWorld)
         {
-            LetGo(context.Process);
+            if (_active)
+            {
+                LetGo(context.Process);
+                _click.Remove(context.Process);
+                _chase.Remove(context.Process);
+                _active = false;
+            }
+
             _volley.Reset();
             _watch.Reset();
 
@@ -356,8 +364,14 @@ public sealed class HuntTask : IAuxTask, IAuxTaskShutdown
         // game's thread ever acts on what this writes.
         if (!_chase.Install(context.Process) || !_click.Install(context.Process))
         {
+            _click.Remove(context.Process);
+            _chase.Remove(context.Process);
+            _active = false;
+
             return;
         }
+
+        _active = true;
 
         // Not in that list, because the hunt works without it — badly, guessing who hit the
         // character from who is nearest, which is what it did before this existed. A client
@@ -473,14 +487,33 @@ public sealed class HuntTask : IAuxTask, IAuxTaskShutdown
 
         try
         {
-            LetGo(process);
-            _click.Remove(process);
-            _chase.Remove(process);
+            ReleaseOwnedState(process);
         }
         catch (GameProcessException)
         {
             // Expected: this runs after the game exits at least as often as before.
         }
+    }
+
+    /// <inheritdoc/>
+    public void SwitchedOff(RemoteProcess process)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+        ReleaseOwnedState(process);
+    }
+
+    /// <summary>Releases only state that an active hunt installed or armed.</summary>
+    private void ReleaseOwnedState(RemoteProcess process)
+    {
+        if (!_active)
+        {
+            return;
+        }
+
+        LetGo(process);
+        _click.Remove(process);
+        _chase.Remove(process);
+        _active = false;
     }
 
     /// <summary>

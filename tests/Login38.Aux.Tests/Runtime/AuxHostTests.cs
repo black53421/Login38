@@ -126,6 +126,20 @@ public sealed class AuxHostTests : IDisposable
         task.Stopped.ShouldBe(1);
     }
 
+    [Fact]
+    public async Task TellsSwitchAwareTasksWhenHelperTurnsOff()
+    {
+        var helperSwitch = Started();
+        var turningOff = new TurningOffTask(helperSwitch);
+        var switchAware = new SwitchOffTask();
+        using var cancellation = new CancellationTokenSource(AuxHost.Cadence * 2.5);
+
+        await Host([turningOff, switchAware], helperSwitch).RunAsync(_process, cancellation.Token);
+
+        switchAware.SwitchOffs.ShouldBe(1);
+        switchAware.Ticks.ShouldBe(0);
+    }
+
     // A task that cannot write its file is not a reason for the next one to lose what it
     // was holding.
     [Fact]
@@ -193,6 +207,46 @@ public sealed class AuxHostTests : IDisposable
             Ticks++;
             throw new GameProcessException("its address has moved");
         }
+    }
+
+    private sealed class TurningOffTask : IAuxTask
+    {
+        private readonly HelperSwitch _switch;
+        private bool _done;
+
+        public TurningOffTask(HelperSwitch helperSwitch) => _switch = helperSwitch;
+
+        public string Name => "turn-off";
+
+        public TimeSpan Interval => AuxHost.Cadence;
+
+        public bool RunsWhileOff => true;
+
+        public void Tick(AuxContext context)
+        {
+            if (_done)
+            {
+                return;
+            }
+
+            _done = true;
+            _switch.Toggle();
+        }
+    }
+
+    private sealed class SwitchOffTask : IAuxTask, IAuxTaskSwitchOff
+    {
+        public string Name => "switch-off";
+
+        public TimeSpan Interval => AuxHost.Cadence;
+
+        public int Ticks { get; private set; }
+
+        public int SwitchOffs { get; private set; }
+
+        public void Tick(AuxContext context) => Ticks++;
+
+        public void SwitchedOff(RemoteProcess process) => SwitchOffs++;
     }
 
     private sealed class ClosingTask : IAuxTask, IAuxTaskShutdown

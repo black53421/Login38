@@ -56,6 +56,18 @@ public interface IAuxTaskShutdown
     void Stopping();
 }
 
+/// <summary>A task that must release client state when the helper switch turns off.</summary>
+/// <remarks>
+/// This is distinct from <see cref="IAuxTaskShutdown"/>: Insert stops feature ticks while the
+/// game and helper host keep running, so waiting for host shutdown would leave any client
+/// hooks or state owned by the feature active for the rest of the session.
+/// </remarks>
+public interface IAuxTaskSwitchOff
+{
+    /// <summary>Called once for each on-to-off transition of the helper switch.</summary>
+    void SwitchedOff(RemoteProcess process);
+}
+
 /// <summary>
 /// Runs the helper features while a game is up.
 /// </summary>
@@ -125,6 +137,7 @@ public sealed class AuxHost
 
         using var timer = new PeriodicTimer(Cadence);
         var clock = Stopwatch.StartNew();
+        var helperWasOn = _switch.IsOn;
 
         try
         {
@@ -138,7 +151,9 @@ public sealed class AuxHost
                     return;
                 }
 
+                ObserveSwitchOff(process, ref helperWasOn);
                 RunDueTasks(schedule, process, clock.Elapsed);
+                ObserveSwitchOff(process, ref helperWasOn);
             }
             while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false));
         }
@@ -150,6 +165,31 @@ public sealed class AuxHost
         {
             StopTasks();
         }
+    }
+
+    /// <summary>
+    /// Gives switch-aware tasks one cleanup pass when Insert turns the helper off.
+    /// </summary>
+    private void ObserveSwitchOff(RemoteProcess process, ref bool wasOn)
+    {
+        var isOn = _switch.IsOn;
+
+        if (wasOn && !isOn)
+        {
+            foreach (var task in _tasks.OfType<IAuxTaskSwitchOff>())
+            {
+                try
+                {
+                    task.SwitchedOff(process);
+                }
+                catch (Exception e) when (e is GameProcessException or InvalidOperationException or IOException)
+                {
+                    _logger.LogWarning(e, "A helper feature could not release its client state");
+                }
+            }
+        }
+
+        wasOn = isOn;
     }
 
     /// <summary>
