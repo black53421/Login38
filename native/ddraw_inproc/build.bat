@@ -3,7 +3,7 @@ REM l38ddraw.dll - injected in-process DDraw present takeover (32-bit / x86)
 setlocal
 pushd "%~dp0"
 
-set "VCVARS=C:\Program Files\Microsoft Visual Studio\18\Community\VC\Auxiliary\Build\vcvars32.bat"
+set "VCVARS=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars32.bat"
 if not exist "%VCVARS%" (
     echo [ERROR] vcvars32.bat not found: %VCVARS%
     popd & exit /b 1

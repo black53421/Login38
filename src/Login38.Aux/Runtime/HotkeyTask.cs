@@ -69,6 +69,12 @@ public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        if (!Wanted(context.Settings.Macros))
+        {
+            StopListening();
+            return;
+        }
+
         if (!Listening(context))
         {
             return;
@@ -93,10 +99,24 @@ public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
     /// A low-level hook left behind would keep swallowing F1 to F4 for the whole machine
     /// after the game has gone, which is a good deal worse than the feature not working.
     /// </remarks>
-    public void Stopping()
+    public void Stopping() => StopListening();
+
+
+    /// <summary>Whether at least one function-key macro can actually run.</summary>
+    internal static bool Wanted(FunctionKeyMacro[] macros)
+    {
+        ArgumentNullException.ThrowIfNull(macros);
+
+        return macros.Any(static macro =>
+            macro.Enabled && !string.IsNullOrWhiteSpace(macro.Command));
+    }
+
+    private void StopListening()
     {
         _hook?.Dispose();
         _hook = null;
+        _tried = false;
+        Array.Clear(_wanted);
     }
 
     /// <summary>Which macro a virtual key belongs to.</summary>

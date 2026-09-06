@@ -11,9 +11,9 @@ namespace Login38.Interop;
 /// </summary>
 /// <remarks>
 /// Everything this launcher does to the game happens from outside it: read, write,
-/// allocate, suspend. No managed code is ever injected. Requires the elevated token
-/// declared in the application manifest, because <c>PROCESS_ALL_ACCESS</c> against
-/// another process needs it.
+/// allocate, create a remote thread for the render helper, and suspend individual game
+/// threads while patching. The process handle itself is opened with only the rights used
+/// by those operations; thread suspension uses separately opened thread handles.
 /// </remarks>
 public sealed class RemoteProcess : IDisposable
 {
@@ -42,7 +42,7 @@ public sealed class RemoteProcess : IDisposable
     /// <exception cref="GameProcessException">The process could not be opened.</exception>
     public static RemoteProcess Open(uint processId)
     {
-        var handle = Kernel32.OpenProcess(ProcessAccess.AllAccess, false, processId);
+        var handle = Kernel32.OpenProcess(ProcessAccess.Patching, false, processId);
         if (handle.IsInvalid)
         {
             handle.Dispose();

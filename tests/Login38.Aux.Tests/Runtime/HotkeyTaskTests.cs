@@ -98,6 +98,23 @@ public sealed class HotkeyTaskTests
     }
 
     [Fact]
+    public void DoesNotNeedAKeyboardHookWhenEveryMacroIsDisabled()
+    {
+        var macros = Macros("加速術/ME");
+        macros[0].Enabled = false;
+
+        HotkeyTask.Wanted(macros).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void DoesNotNeedAKeyboardHookWhenCommandsAreEmpty() =>
+        HotkeyTask.Wanted(Macros()).ShouldBeFalse();
+
+    [Fact]
+    public void NeedsAKeyboardHookWhenAnEnabledMacroHasACommand() =>
+        HotkeyTask.Wanted(Macros("加速術/ME")).ShouldBeTrue();
+
+    [Fact]
     public void RunsOnEveryPassBecauseSomebodyIsWaitingOnIt() =>
         HotkeyTask.Keys.Length.ShouldBe(AuxSettings.FunctionKeyMacros);
 

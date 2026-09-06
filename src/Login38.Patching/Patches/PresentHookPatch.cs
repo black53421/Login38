@@ -109,11 +109,13 @@ public sealed class PresentHookPatch : IGamePatch
     /// </remarks>
     internal static string ResolveDll()
     {
+#if DEBUG
         if (Environment.GetEnvironmentVariable(OverrideVariable) is { Length: > 0 } overridePath &&
             File.Exists(overridePath))
         {
             return overridePath;
         }
+#endif
 
         var directory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Lineage38Launcher");

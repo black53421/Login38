@@ -18,10 +18,10 @@ internal enum ProcessAccess : uint
     Synchronize = 0x0010_0000,
 
     /// <summary>
-    /// What the patching pipeline needs. Requires the elevated token declared in the
-    /// application manifest.
+    /// Rights required by the Login38 patching pipeline. Keep this deliberately narrower
+    /// than PROCESS_ALL_ACCESS so the launcher requests only the capabilities it uses.
     /// </summary>
-    AllAccess = 0x001F_0FFF,
+    Patching = CreateThread | VmOperation | VmRead | VmWrite | QueryInformation | Synchronize,
 }
 
 [Flags]
