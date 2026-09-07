@@ -39,6 +39,8 @@ public sealed class AuxViewModelTests
             TransformFileName = "halloween",
             PickupToastEnabled = false,
             ExpDriftEnabled = false,
+            OwnerCompanionPassThrough = false,
+            OtherCompanionPassThrough = true,
             InternalBotEnabled = true,
             MultiInstance = true,
             MultiInstanceLimit = 4,
@@ -68,6 +70,8 @@ public sealed class AuxViewModelTests
         back.TransformFileName.ShouldBe("halloween");
         back.PickupToastEnabled.ShouldBeFalse();
         back.ExpDriftEnabled.ShouldBeFalse();
+        back.OwnerCompanionPassThrough.ShouldBeFalse();
+        back.OtherCompanionPassThrough.ShouldBeTrue();
         back.InternalBotEnabled.ShouldBeTrue();
         back.MultiInstance.ShouldBeTrue();
         back.MultiInstanceLimit.ShouldBe(4u);

@@ -88,6 +88,12 @@ public sealed class AuxConfig
     /// <summary>Floating experience and coin text.</summary>
     public bool ExpDriftEnabled { get; set; }
 
+    /// <summary>Allow the local player to move through their own pet/summon.</summary>
+    public bool OwnerCompanionPassThrough { get; set; } = true;
+
+    /// <summary>Allow the local player to move through another player's pet/summon.</summary>
+    public bool OtherCompanionPassThrough { get; set; }
+
     /// <summary>
     /// Whether the helper offers automatic hunting at all.
     /// </summary>

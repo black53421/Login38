@@ -328,6 +328,21 @@
                             <CheckBox Content="金幣經驗值提示"
                                       Margin="{StaticResource RowSpacing}"
                                       IsChecked="{Binding GainDrift, Mode=TwoWay}" />
+
+                            <Separator Margin="0,10" />
+
+                            <TextBlock Text="寵物／召喚獸碰撞" Style="{StaticResource SectionHead}" />
+                            <CheckBox Content="可穿越自己的寵物／召喚獸"
+                                      Margin="{StaticResource RowSpacing}"
+                                      IsChecked="{Binding OwnerCompanionPassThrough, Mode=TwoWay}" />
+                            <CheckBox Content="可穿越其他玩家的寵物／召喚獸"
+                                      Margin="{StaticResource RowSpacing}"
+                                      IsChecked="{Binding OtherCompanionPassThrough, Mode=TwoWay}" />
+                            <TextBlock Style="{StaticResource Text.Caption}"
+                                       Text="僅調整移動碰撞，不改變控制、攻擊與目標判定。"
+                                       TextWrapping="Wrap"
+                                       Margin="24,0,0,8" />
+
                             <CheckBox Content="開啟自動狩獵"
                                       Margin="{StaticResource RowSpacing}"
                                       Visibility="{Binding Helper, Converter={StaticResource BooleanToVisibility}}"

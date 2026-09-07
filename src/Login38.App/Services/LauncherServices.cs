@@ -193,6 +193,8 @@ public static class LauncherServices
         services.AddSingleton<IGamePatch, TimeProtectionBypassPatch>();
         services.AddSingleton<IGamePatch, MorphTablePatch>();
         services.AddSingleton<IGamePatch, SmoothRunPatch>();
+        services.AddSingleton<IGamePatch, CompanionCollisionProbePatch>();
+        services.AddSingleton<IGamePatch, OwnerCompanionPassThroughPatch>();
         services.AddSingleton<IGamePatch, LoginHookPatch>();
         services.AddSingleton<IGamePatch, AntiCheatBypassPatch>();
         services.AddSingleton<IGamePatch, CrtWatsonPatch>();

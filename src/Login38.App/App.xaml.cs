@@ -1,14 +1,18 @@
+using System.Globalization;
 using System.IO;
 using System.Security.Cryptography;
+using System.Text;
 using System.Windows;
 using System.Windows.Threading;
 using Login38.App.Services;
 using Login38.App.ViewModels;
 using Login38.App.Views;
 using Login38.Core.Diagnostics;
+using Login38.Patching;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Login38.App;
 
@@ -22,16 +26,22 @@ namespace Login38.App;
 /// </remarks>
 public partial class App : Application
 {
+    private const string StartupDebugBuildMarker =
+        "2026-09-06-companion-collision-probe-debug-v1";
+
     private IHost? _host;
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
+        WriteStartupDebugSnapshot("before-host-build", services: null);
+
         _host = Host.CreateApplicationBuilder()
             .ConfigureLauncher()
             .Build();
 
+        WriteStartupDebugSnapshot("after-host-build", _host.Services);
         Stamp(_host.Services.GetService<ILogger<App>>());
 
         var window = _host.Services.GetRequiredService<MainWindow>();
@@ -43,6 +53,146 @@ public partial class App : Application
         // hidden, and hiding it would end the patching and the helper with it. So the end
         // of the session is said here, once, for the one window that is the launcher.
         window.Closed += (_, _) => Shutdown();
+    }
+
+    /// <summary>
+    /// Writes a logger-independent startup snapshot for launcher deployment debugging.
+    /// </summary>
+    /// <remarks>
+    /// This intentionally bypasses ILogger so it can prove which executable is running
+    /// even when file logging itself is the feature under investigation.
+    /// </remarks>
+    private static void WriteStartupDebugSnapshot(string stage, IServiceProvider? services)
+    {
+        var text = new StringBuilder();
+        text.AppendLine(CultureInfo.InvariantCulture, $"marker={StartupDebugBuildMarker}");
+        text.AppendLine(CultureInfo.InvariantCulture, $"stage={stage}");
+        text.AppendLine(CultureInfo.InvariantCulture, $"utc={DateTimeOffset.UtcNow:O}");
+        text.AppendLine(CultureInfo.InvariantCulture, $"process_id={Environment.ProcessId}");
+        text.AppendLine(CultureInfo.InvariantCulture, $"process_path={Environment.ProcessPath ?? "<null>"}");
+        text.AppendLine(CultureInfo.InvariantCulture, $"base_directory={AppContext.BaseDirectory}");
+        text.AppendLine(CultureInfo.InvariantCulture, $"current_directory={Environment.CurrentDirectory}");
+        text.AppendLine(CultureInfo.InvariantCulture, $"is_64_bit_process={Environment.Is64BitProcess}");
+        text.AppendLine(CultureInfo.InvariantCulture, $"command_line={Environment.CommandLine}");
+
+        AppendRunningImageIdentity(text);
+
+        text.AppendLine("environment:");
+        var variables = Environment.GetEnvironmentVariables();
+        var login38Variables = new List<(string Name, string Value)>();
+
+        foreach (System.Collections.DictionaryEntry entry in variables)
+        {
+            var name = entry.Key?.ToString();
+            if (name is null || !name.StartsWith("LOGIN38_", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            login38Variables.Add((name, entry.Value?.ToString() ?? string.Empty));
+        }
+
+        login38Variables.Sort(static (left, right) =>
+            StringComparer.OrdinalIgnoreCase.Compare(left.Name, right.Name));
+
+        if (login38Variables.Count == 0)
+        {
+            text.AppendLine("  <none>");
+        }
+        else
+        {
+            foreach (var (name, value) in login38Variables)
+            {
+                text.AppendLine(CultureInfo.InvariantCulture, $"  {name}={value}");
+            }
+        }
+
+        if (services is not null)
+        {
+            AppendResolvedServices(text, services);
+        }
+
+        TryWriteStartupDebugFile(text.ToString(), stage);
+    }
+
+    private static void AppendRunningImageIdentity(StringBuilder text)
+    {
+        var path = Environment.ProcessPath;
+        if (path is null)
+        {
+            text.AppendLine("image_sha256=<process path unavailable>");
+            return;
+        }
+
+        try
+        {
+            using var file = File.OpenRead(path);
+            text.AppendLine(CultureInfo.InvariantCulture, $"image_sha256={Convert.ToHexString(SHA256.HashData(file))}");
+            text.AppendLine(CultureInfo.InvariantCulture, $"image_last_write_utc={File.GetLastWriteTimeUtc(path):O}");
+            text.AppendLine(CultureInfo.InvariantCulture, $"image_length={new FileInfo(path).Length}");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            text.AppendLine(CultureInfo.InvariantCulture, $"image_identity_error={e.GetType().Name}: {e.Message}");
+        }
+    }
+
+    private static void AppendResolvedServices(StringBuilder text, IServiceProvider services)
+    {
+        var options = services.GetService<IOptions<LauncherLogOptions>>()?.Value;
+        if (options is null)
+        {
+            text.AppendLine("launcher_log_options=<not resolved>");
+        }
+        else
+        {
+            text.AppendLine(CultureInfo.InvariantCulture, $"launcher_log_write_to_file={options.WriteToFile}");
+            text.AppendLine(CultureInfo.InvariantCulture, $"launcher_log_general_path={options.GeneralFilePath}");
+            text.AppendLine(CultureInfo.InvariantCulture, $"launcher_log_startup_path={options.StartupFilePath}");
+        }
+
+        var patches = services.GetServices<IGamePatch>()
+            .Select(static patch => patch.GetType().FullName ?? patch.GetType().Name)
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
+
+        text.AppendLine(CultureInfo.InvariantCulture, $"registered_game_patch_count={patches.Length}");
+        foreach (var patch in patches)
+        {
+            text.AppendLine(CultureInfo.InvariantCulture, $"  patch={patch}");
+        }
+
+        text.AppendLine(
+            CultureInfo.InvariantCulture,
+            $"companion_collision_probe_registered={patches.Any(static name => name.EndsWith(".CompanionCollisionProbePatch", StringComparison.Ordinal))}");
+    }
+
+    private static void TryWriteStartupDebugFile(string contents, string stage)
+    {
+        var fileName = $"login38_startup_debug_{stage}.txt";
+        var primaryPath = Path.Combine(AppContext.BaseDirectory, fileName);
+
+        try
+        {
+            File.WriteAllText(primaryPath, contents, Encoding.UTF8);
+            return;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            _ = e;
+            // Fall through to TEMP so a read-only deployment folder still leaves evidence.
+        }
+
+        try
+        {
+            var fallbackPath = Path.Combine(Path.GetTempPath(), fileName);
+            File.WriteAllText(fallbackPath, contents, Encoding.UTF8);
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            _ = e;
+            // Debug output must never prevent the launcher from starting.
+        }
     }
 
     /// <summary>

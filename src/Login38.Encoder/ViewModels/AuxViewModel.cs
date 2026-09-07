@@ -150,6 +150,12 @@ public sealed partial class AuxViewModel : ObservableObject
     private bool _gainDrift = false;
 
     [ObservableProperty]
+    private bool _ownerCompanionPassThrough = true;
+
+    [ObservableProperty]
+    private bool _otherCompanionPassThrough;
+
+    [ObservableProperty]
     private bool _internalBot;
 
     [ObservableProperty]
@@ -184,6 +190,8 @@ public sealed partial class AuxViewModel : ObservableObject
         IconPackageName = aux.DynamicIconPakName;
         PickupToast = aux.PickupToastEnabled;
         GainDrift = aux.ExpDriftEnabled;
+        OwnerCompanionPassThrough = aux.OwnerCompanionPassThrough;
+        OtherCompanionPassThrough = aux.OtherCompanionPassThrough;
         InternalBot = aux.InternalBotEnabled;
         MultipleCopies = aux.MultiInstance;
         CopyLimit = aux.MultiInstanceLimit;
@@ -216,6 +224,8 @@ public sealed partial class AuxViewModel : ObservableObject
         DynamicIconPakName = IconPackageName.Trim() is { Length: > 0 } name ? name : "123",
         PickupToastEnabled = PickupToast,
         ExpDriftEnabled = GainDrift,
+        OwnerCompanionPassThrough = OwnerCompanionPassThrough,
+        OtherCompanionPassThrough = OtherCompanionPassThrough,
         InternalBotEnabled = InternalBot,
         MultiInstance = MultipleCopies,
         MultiInstanceLimit = Bounded(

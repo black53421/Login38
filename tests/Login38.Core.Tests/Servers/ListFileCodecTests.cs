@@ -92,6 +92,8 @@ public sealed class ListFileCodecTests
                 DynamicIconEnabled = true,
                 PickupToastEnabled = false,
                 ExpDriftEnabled = false,
+                OwnerCompanionPassThrough = false,
+                OtherCompanionPassThrough = true,
                 InventoryLimitValue = 500,
                 ImgLimitValue = 123_456,
                 DynamicIconPakName = "999",
@@ -148,6 +150,15 @@ public sealed class ListFileCodecTests
     public void UnparseableLimitsFallBackToTheDefault(string value) =>
         ListFileCodec.Parse($"[aux]\ninventory_limit_value={value}\n")
             .Aux.InventoryLimitValue.ShouldBe(AuxConfig.InventoryLimitBounds.Default);
+
+    [Fact]
+    public void OlderConfigGetsSafeCompanionCollisionDefaults()
+    {
+        var aux = ListFileCodec.Parse("[aux]\npacket_encrypt=true\n").Aux;
+
+        aux.OwnerCompanionPassThrough.ShouldBeTrue();
+        aux.OtherCompanionPassThrough.ShouldBeFalse();
+    }
 
     [Fact]
     public void EmptyIconPakNameKeepsTheDefault() =>

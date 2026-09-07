@@ -112,6 +112,8 @@ public static class ListFileCodec
         AppendBool(output, "dynamic_dialog_enabled", aux.DynamicDialogEnabled);
         AppendBool(output, "pickup_toast_enabled", aux.PickupToastEnabled);
         AppendBool(output, "exp_drift_enabled", aux.ExpDriftEnabled);
+        AppendBool(output, "owner_companion_pass_through", aux.OwnerCompanionPassThrough);
+        AppendBool(output, "other_companion_pass_through", aux.OtherCompanionPassThrough);
         AppendBool(output, "internal_bot_enabled", aux.InternalBotEnabled);
         AppendBool(output, "dynamic_icon_enabled", aux.DynamicIconEnabled);
         AppendText(output, "dynamic_icon_pak_name", aux.DynamicIconPakName);
@@ -177,6 +179,8 @@ public static class ListFileCodec
             case "dynamic_icon_enabled": aux.DynamicIconEnabled = BooleanText.IsTruthy(value); break;
             case "pickup_toast_enabled": aux.PickupToastEnabled = BooleanText.IsTruthy(value); break;
             case "exp_drift_enabled": aux.ExpDriftEnabled = BooleanText.IsTruthy(value); break;
+            case "owner_companion_pass_through": aux.OwnerCompanionPassThrough = BooleanText.IsTruthy(value); break;
+            case "other_companion_pass_through": aux.OtherCompanionPassThrough = BooleanText.IsTruthy(value); break;
             case "internal_bot_enabled": aux.InternalBotEnabled = BooleanText.IsTruthy(value); break;
 
             case "multi_instance_limit":
