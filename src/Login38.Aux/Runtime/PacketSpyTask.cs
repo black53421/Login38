@@ -15,10 +15,9 @@ namespace Login38.Aux.Runtime;
 /// client version's would be found again.
 /// </para>
 /// <para>
-/// This one owns its detour rather than leaving it to <see cref="ToggleTask"/>, because
-/// there is only one clock involved — putting the recorder in and reading what it recorded
-/// are the same job on the same cadence, and splitting them would mean a second type whose
-/// only purpose is to hold an address for this one.
+/// The ordinary in-world switch installs its own detour. Startup diagnostics can install
+/// the same recorder earlier through <see cref="PacketSpyStartupState"/>; in that mode this
+/// task only drains the ring and leaves installation timing to the startup patch.
 /// </para>
 /// <para>
 /// The reference never removes it. Its <c>uninstall</c> carries <c>#[allow(dead_code)]</c>
@@ -29,6 +28,7 @@ namespace Login38.Aux.Runtime;
 public sealed class PacketSpyTask : IAuxTask, IAuxTaskShutdown
 {
     private readonly ILogger<PacketSpyTask> _logger;
+    private readonly PacketSpyStartupState _startup;
 
     private RemoteProcess? _game;
     private GameAddress? _cave;
@@ -36,7 +36,11 @@ public sealed class PacketSpyTask : IAuxTask, IAuxTaskShutdown
     private uint _read;
     private bool _reported;
 
-    public PacketSpyTask(ILogger<PacketSpyTask> logger) => _logger = logger;
+    public PacketSpyTask(ILogger<PacketSpyTask> logger, PacketSpyStartupState startup)
+    {
+        _logger = logger;
+        _startup = startup;
+    }
 
     /// <inheritdoc/>
     public string Name => "packet-log";
@@ -49,20 +53,31 @@ public sealed class PacketSpyTask : IAuxTask, IAuxTaskShutdown
     public TimeSpan Interval => TimeSpan.FromMilliseconds(200);
 
     /// <inheritdoc/>
+    public bool RunsWhileOff => true;
+
+    /// <inheritdoc/>
     public void Tick(AuxContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
         try
         {
-            if (!context.Settings.Misc.LogSentPackets)
-            {
-                Remove(context.Process);
+            _game = context.Process;
 
+            if (_startup.TryGet(context.Process.Id, out var startup))
+            {
+                _cave = startup.Cave;
+                _jump = startup.Jump;
+                Drain(context.Process, startup.Cave);
+                _reported = false;
                 return;
             }
 
-            _game = context.Process;
+            if (!context.Settings.Misc.LogSentPackets)
+            {
+                Remove(context.Process);
+                return;
+            }
 
             if (Install(context.Process) is { } cave)
             {
@@ -89,16 +104,21 @@ public sealed class PacketSpyTask : IAuxTask, IAuxTaskShutdown
     /// </remarks>
     public void Stopping()
     {
-        if (_game is { IsRunning: true } game)
+        if (_game is { } game)
         {
-            try
+            if (game.IsRunning)
             {
-                Remove(game);
+                try
+                {
+                    Remove(game);
+                }
+                catch (GameProcessException e)
+                {
+                    _logger.LogWarning(e, "{Task} could not be taken out of the game", Name);
+                }
             }
-            catch (GameProcessException e)
-            {
-                _logger.LogWarning(e, "{Task} could not be taken out of the game", Name);
-            }
+
+            _startup.Remove(game.Id);
         }
 
         _game = null;

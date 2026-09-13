@@ -87,6 +87,9 @@ public static class LauncherServices
         services.AddScoped<HelperDispatch>();
         services.AddScoped<InventoryWatch>();
 
+        services.AddSingleton<RangeSkillDamageProtocolState>();
+        services.AddSingleton<PacketSpyStartupState>();
+
         services.AddScoped<IGameToggle, AllDayToggle>();
         services.AddScoped<IGameToggle, LowCpuToggle>();
         services.AddScoped<IGameToggle, DamageToggle>();
@@ -196,6 +199,8 @@ public static class LauncherServices
         services.AddSingleton<IGamePatch, CompanionCollisionProbePatch>();
         services.AddSingleton<IGamePatch, OwnerCompanionPassThroughPatch>();
         services.AddSingleton<IGamePatch, LoginHookPatch>();
+        services.AddSingleton<IGamePatch, PacketSpyStartupPatch>();
+        services.AddSingleton<IGamePatch, RangeSkillDamageProtocolPatch>();
         services.AddSingleton<IGamePatch, AntiCheatBypassPatch>();
         services.AddSingleton<IGamePatch, CrtWatsonPatch>();
         services.AddSingleton<IGamePatch, ChatWidthPatch>();

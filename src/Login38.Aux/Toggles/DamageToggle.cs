@@ -22,12 +22,17 @@ namespace Login38.Aux.Toggles;
 public sealed class DamageToggle : IGameToggle
 {
     private readonly ILogger<DamageToggle> _logger;
+    private readonly RangeSkillDamageProtocolState _protocol;
 
     private Cave? _numbers;
     private Cave? _feet;
     private bool _reported;
 
-    public DamageToggle(ILogger<DamageToggle> logger) => _logger = logger;
+    public DamageToggle(ILogger<DamageToggle> logger, RangeSkillDamageProtocolState protocol)
+    {
+        _logger = logger;
+        _protocol = protocol;
+    }
 
     /// <inheritdoc/>
     public string Name => "damage-numbers";
@@ -69,7 +74,20 @@ public sealed class DamageToggle : IGameToggle
             // The one before the other in both directions: the numbers have to exist before
             // there is anything to move, and moving has to stop before they do or the last
             // bubble is left with its tail upside down.
+            var protocolActive = _protocol.TryGet(process.Id, out var protocol);
+            if (protocolActive && !numbers)
+            {
+                uint disabled = 0;
+                process.Write(protocol.AreaEnabled, disabled);
+            }
+
             var ok = numbers ? Want(process, ref _numbers, Numbers) : Drop(process, ref _numbers);
+
+            if (ok && protocolActive && numbers)
+            {
+                uint enabled = 1;
+                process.Write(protocol.AreaEnabled, enabled);
+            }
 
             ok &= feet && numbers ? Want(process, ref _feet, Feet) : Drop(process, ref _feet);
 
@@ -156,10 +174,17 @@ public sealed class DamageToggle : IGameToggle
         cave.Sites.All(entry => entry.Site.Read(process, entry.Jump) == SiteState.Ours);
 
     /// <summary>Writes the cave that draws the numbers, and detours into it.</summary>
-    private static Cave Numbers(RemoteProcess process)
+    private Cave Numbers(RemoteProcess process)
     {
         Expect(process, DamageCave.Single);
-        Expect(process, DamageCave.Area);
+
+        if (_protocol.TryGet(process.Id, out var protocol))
+        {
+            return new Cave(protocol.Cave,
+            [
+                Detour(process, DamageCave.Single, protocol.SingleEntry),
+            ]);
+        }
 
         var cave = process.AllocateExecutable(DamageCave.CaveSize);
         var (code, entries) = DamageCave.Build(cave, TickCount(process));
@@ -170,7 +195,6 @@ public sealed class DamageToggle : IGameToggle
         return new Cave(cave,
         [
             Detour(process, DamageCave.Single, cave + entries.Single),
-            Detour(process, DamageCave.Area, cave + entries.Area),
         ]);
     }
 

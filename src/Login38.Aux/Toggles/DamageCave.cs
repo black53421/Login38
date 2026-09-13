@@ -143,13 +143,16 @@ internal static class DamageCave
         /// <summary>Where the client's own <c>GetTickCount</c> is.</summary>
         public GameAddress Tick => At(11);
 
+        /// <summary>Whether the helper should draw range-skill damage numbers.</summary>
+        public GameAddress AreaEnabled => At(12);
+
         /// <summary>The line being built.</summary>
-        public GameAddress Text => At(12);
+        public GameAddress Text => At(13);
 
         /// <summary>How long the whole allocation has to be.</summary>
         public int Size => Code + (Slots * 4) + TextLength;
 
-        private const int Slots = 12;
+        private const int Slots = 13;
 
         private GameAddress At(int slot) => Cave + (Code + (slot * 4));
 
@@ -195,6 +198,10 @@ internal static class DamageCave
 
         return ([.. code, .. layout.Data(getTickCount)], entries);
     }
+
+
+    internal static GameAddress AreaEnabledAddress(GameAddress cave, Entries entries) =>
+        new Layout(cave, entries.Length).AreaEnabled;
 
     private static (byte[] Code, Entries Entries) Emit(GameAddress cave, Layout data)
     {
@@ -341,6 +348,9 @@ internal static class DamageCave
         Enter(code, data);
 
         code.Bytes([0x89, 0x15]).Dword(data.Damage.Value);            // mov [damage], edx
+
+        code.Bytes([0x83, 0x3D]).Dword(data.AreaEnabled.Value).Byte(0x00); // cmp dword ptr [enabled], 0
+        giveUp.Add(code.NearJump(0x84));
 
         code.Bytes([0x8B, 0x55, 0xE4]);                               // mov edx, [ebp-0x1C] caster
         OnlyMine(code, giveUp);

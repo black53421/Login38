@@ -156,6 +156,12 @@ public sealed partial class AuxViewModel : ObservableObject
     private bool _otherCompanionPassThrough;
 
     [ObservableProperty]
+    private bool _rangeSkillDamageExtension;
+
+    [ObservableProperty]
+    private bool _packetSpyStartup;
+
+    [ObservableProperty]
     private bool _internalBot;
 
     [ObservableProperty]
@@ -166,6 +172,22 @@ public sealed partial class AuxViewModel : ObservableObject
 
     [ObservableProperty]
     private TextEncodingMode _encoding = TextEncodingMode.Big5;
+
+    partial void OnRangeSkillDamageExtensionChanged(bool value)
+    {
+        if (value && PacketSpyStartup)
+        {
+            PacketSpyStartup = false;
+        }
+    }
+
+    partial void OnPacketSpyStartupChanged(bool value)
+    {
+        if (value && RangeSkillDamageExtension)
+        {
+            RangeSkillDamageExtension = false;
+        }
+    }
 
     /// <summary>Fills the switches in from the settings.</summary>
     public void Load(AuxConfig aux)
@@ -192,6 +214,8 @@ public sealed partial class AuxViewModel : ObservableObject
         GainDrift = aux.ExpDriftEnabled;
         OwnerCompanionPassThrough = aux.OwnerCompanionPassThrough;
         OtherCompanionPassThrough = aux.OtherCompanionPassThrough;
+        RangeSkillDamageExtension = aux.RangeSkillDamageExtension;
+        PacketSpyStartup = aux.PacketSpyStartupEnabled;
         InternalBot = aux.InternalBotEnabled;
         MultipleCopies = aux.MultiInstance;
         CopyLimit = aux.MultiInstanceLimit;
@@ -226,6 +250,8 @@ public sealed partial class AuxViewModel : ObservableObject
         ExpDriftEnabled = GainDrift,
         OwnerCompanionPassThrough = OwnerCompanionPassThrough,
         OtherCompanionPassThrough = OtherCompanionPassThrough,
+        RangeSkillDamageExtension = RangeSkillDamageExtension,
+        PacketSpyStartupEnabled = PacketSpyStartup,
         InternalBotEnabled = InternalBot,
         MultiInstance = MultipleCopies,
         MultiInstanceLimit = Bounded(

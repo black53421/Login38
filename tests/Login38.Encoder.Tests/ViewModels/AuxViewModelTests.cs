@@ -41,6 +41,8 @@ public sealed class AuxViewModelTests
             ExpDriftEnabled = false,
             OwnerCompanionPassThrough = false,
             OtherCompanionPassThrough = true,
+            RangeSkillDamageExtension = true,
+            PacketSpyStartupEnabled = false,
             InternalBotEnabled = true,
             MultiInstance = true,
             MultiInstanceLimit = 4,
@@ -72,6 +74,8 @@ public sealed class AuxViewModelTests
         back.ExpDriftEnabled.ShouldBeFalse();
         back.OwnerCompanionPassThrough.ShouldBeFalse();
         back.OtherCompanionPassThrough.ShouldBeTrue();
+        back.RangeSkillDamageExtension.ShouldBeTrue();
+        back.PacketSpyStartupEnabled.ShouldBeFalse();
         back.InternalBotEnabled.ShouldBeTrue();
         back.MultiInstance.ShouldBeTrue();
         back.MultiInstanceLimit.ShouldBe(4u);
@@ -149,6 +153,28 @@ public sealed class AuxViewModelTests
 
     // It is in the file format and the launcher clears it on both load and save, so a
     // switch for it would be a switch that does nothing — which is what the reference had.
+    [Fact]
+    public void StartupPacketSpyDisablesRangeDamageProtocol()
+    {
+        var model = new AuxViewModel { RangeSkillDamageExtension = true };
+
+        model.PacketSpyStartup = true;
+
+        model.PacketSpyStartup.ShouldBeTrue();
+        model.RangeSkillDamageExtension.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void RangeDamageProtocolDisablesStartupPacketSpy()
+    {
+        var model = new AuxViewModel { PacketSpyStartup = true };
+
+        model.RangeSkillDamageExtension = true;
+
+        model.RangeSkillDamageExtension.ShouldBeTrue();
+        model.PacketSpyStartup.ShouldBeFalse();
+    }
+
     [Fact]
     public void NeverTurnsOnTheProtectionTheLauncherDoesNotImplement() =>
         new AuxViewModel().ToConfig().AntiCheatAdvanced.ShouldBeFalse();

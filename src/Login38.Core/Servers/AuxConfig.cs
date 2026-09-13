@@ -94,6 +94,12 @@ public sealed class AuxConfig
     /// <summary>Allow the local player to move through another player's pet/summon.</summary>
     public bool OtherCompanionPassThrough { get; set; }
 
+    /// <summary>Use the Login38 per-target range-skill damage protocol extension.</summary>
+    public bool RangeSkillDamageExtension { get; set; }
+
+    /// <summary>Record client send calls from startup, before a character enters the world.</summary>
+    public bool PacketSpyStartupEnabled { get; set; }
+
     /// <summary>
     /// Whether the helper offers automatic hunting at all.
     /// </summary>

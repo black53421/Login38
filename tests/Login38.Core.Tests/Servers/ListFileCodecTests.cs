@@ -94,6 +94,8 @@ public sealed class ListFileCodecTests
                 ExpDriftEnabled = false,
                 OwnerCompanionPassThrough = false,
                 OtherCompanionPassThrough = true,
+                RangeSkillDamageExtension = true,
+                PacketSpyStartupEnabled = false,
                 InventoryLimitValue = 500,
                 ImgLimitValue = 123_456,
                 DynamicIconPakName = "999",
@@ -150,6 +152,11 @@ public sealed class ListFileCodecTests
     public void UnparseableLimitsFallBackToTheDefault(string value) =>
         ListFileCodec.Parse($"[aux]\ninventory_limit_value={value}\n")
             .Aux.InventoryLimitValue.ShouldBe(AuxConfig.InventoryLimitBounds.Default);
+
+    [Fact]
+    public void ParsesStartupPacketSpySwitch() =>
+        ListFileCodec.Parse("[aux]\npacket_spy_startup_enabled=true\n")
+            .Aux.PacketSpyStartupEnabled.ShouldBeTrue();
 
     [Fact]
     public void OlderConfigGetsSafeCompanionCollisionDefaults()

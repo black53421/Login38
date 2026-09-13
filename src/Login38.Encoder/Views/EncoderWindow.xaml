@@ -343,6 +343,26 @@
                                        TextWrapping="Wrap"
                                        Margin="24,0,0,8" />
 
+                            <Separator Margin="0,10" />
+
+                            <TextBlock Text="傷害顯示協定" Style="{StaticResource SectionHead}" />
+                            <CheckBox Content="啟用範圍魔法每目標傷害擴充"
+                                      Margin="{StaticResource RowSpacing}"
+                                      IsChecked="{Binding RangeSkillDamageExtension, Mode=TwoWay}" />
+                            <TextBlock Style="{StaticResource Text.Caption}"
+                                       Text="需搭配支援此協定的 Server；只影響 Login38 的範圍魔法傷害數字，不改變實際傷害。"
+                                       TextWrapping="Wrap"
+                                       Margin="24,0,0,8" />
+
+                            <TextBlock Text="封包診斷" Style="{StaticResource SectionHead}" Margin="0,8,0,0" />
+                            <CheckBox Content="Client 啟動時即記錄送出封包"
+                                      Margin="{StaticResource RowSpacing}"
+                                      IsChecked="{Binding PacketSpyStartup, Mode=TwoWay}" />
+                            <TextBlock Style="{StaticResource Text.Caption}"
+                                       Text="用於抓登入初期封包，不必進入遊戲按 HOME。此模式與範圍魔法每目標傷害擴充共用同一個 Client hook，兩者不可同時啟用。"
+                                       TextWrapping="Wrap"
+                                       Margin="24,0,0,8" />
+
                             <CheckBox Content="開啟自動狩獵"
                                       Margin="{StaticResource RowSpacing}"
                                       Visibility="{Binding Helper, Converter={StaticResource BooleanToVisibility}}"

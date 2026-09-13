@@ -44,7 +44,7 @@ public sealed class LauncherServicesTests
     }
 
     [Fact]
-    public void RegistersEveryPatch() => Patches().Count.ShouldBe(25);
+    public void RegistersEveryPatch() => Patches().Count.ShouldBe(26);
 
     [Fact]
     public void GivesEveryPatchADistinctName()
@@ -122,7 +122,16 @@ public sealed class LauncherServicesTests
 
     [Fact]
     public void RunsMostPatchesAtStartup() =>
-        Patches().Count(p => p.Phase == PatchPhase.Startup).ShouldBe(19);
+        Patches().Count(p => p.Phase == PatchPhase.Startup).ShouldBe(20);
+
+    [Fact]
+    public void InstallsStartupPacketSpyBeforeRangeDamageProtocol()
+    {
+        var patches = Patches();
+
+        PositionOf<PacketSpyStartupPatch>(patches)
+            .ShouldBeLessThan(PositionOf<RangeSkillDamageProtocolPatch>(patches));
+    }
 
     // On its own, because it waits for the client to load Winsock — about half a minute
     // into a launch. While it sat among the startup patches, every other patch and the

@@ -17,18 +17,18 @@ public sealed class DamageToggleTests : IDisposable
 
     [Fact]
     public void IsWantedWhenTheNumbersAreAskedFor() =>
-        new DamageToggle(NullLogger<DamageToggle>.Instance)
+        new DamageToggle(NullLogger<DamageToggle>.Instance, new RangeSkillDamageProtocolState())
             .WantedBy(new AuxSettings { Misc = { ShowAttackDamage = true } }).ShouldBeTrue();
 
     // Under the feet is a way of showing them, so asking for that asks for them.
     [Fact]
     public void IsWantedWhenOnlyTheFeetSwitchIsOn() =>
-        new DamageToggle(NullLogger<DamageToggle>.Instance)
+        new DamageToggle(NullLogger<DamageToggle>.Instance, new RangeSkillDamageProtocolState())
             .WantedBy(new AuxSettings { Misc = { DamageAtFeet = true } }).ShouldBeTrue();
 
     [Fact]
     public void IsNotWantedWhenNeitherIs() =>
-        new DamageToggle(NullLogger<DamageToggle>.Instance)
+        new DamageToggle(NullLogger<DamageToggle>.Instance, new RangeSkillDamageProtocolState())
             .WantedBy(new AuxSettings()).ShouldBeFalse();
 
     // Against a process that is not the game: none of the sites holds what the client is
@@ -36,13 +36,13 @@ public sealed class DamageToggleTests : IDisposable
     // than thrown through the middle of a pass.
     [Fact]
     public void RefusesToDetourAClientItDoesNotRecognise() =>
-        new DamageToggle(NullLogger<DamageToggle>.Instance).Apply(_process, wanted: true).ShouldBeFalse();
+        new DamageToggle(NullLogger<DamageToggle>.Instance, new RangeSkillDamageProtocolState()).Apply(_process, wanted: true).ShouldBeFalse();
 
     // Nothing to take out is not a failure — it is the ordinary state of a game whose
     // player has never turned this on.
     [Fact]
     public void HasNothingToDoWhenItIsOffAndWasNeverOn() =>
-        new DamageToggle(NullLogger<DamageToggle>.Instance).Apply(_process, wanted: false).ShouldBeTrue();
+        new DamageToggle(NullLogger<DamageToggle>.Instance, new RangeSkillDamageProtocolState()).Apply(_process, wanted: false).ShouldBeTrue();
 
     [Fact]
     public void ReplacesASiteWithAJumpToTheCave()

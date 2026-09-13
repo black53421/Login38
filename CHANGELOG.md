@@ -51,3 +51,9 @@ Scaled present, overlay lifetime, client-owned toggles and exit latency.
 ## 1.0.0
 
 First public release.
+
+## 2026-09-13 - RangeSkill capability marker fix
+
+- Correct the 3.80C `C_ServerVersion` client-version stack slot from `[esp+0x20]` to `[esp+0x1C]`, based on startup PacketSpy output for `"chdcddc"`.
+- Guard the marker write with the observed caller return address `0x004E0EE1` and opcode `0x0E`.
+- Add a byte-level regression test for the marker cave.

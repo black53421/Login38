@@ -114,6 +114,8 @@ public static class ListFileCodec
         AppendBool(output, "exp_drift_enabled", aux.ExpDriftEnabled);
         AppendBool(output, "owner_companion_pass_through", aux.OwnerCompanionPassThrough);
         AppendBool(output, "other_companion_pass_through", aux.OtherCompanionPassThrough);
+        AppendBool(output, "range_skill_damage_extension", aux.RangeSkillDamageExtension);
+        AppendBool(output, "packet_spy_startup_enabled", aux.PacketSpyStartupEnabled);
         AppendBool(output, "internal_bot_enabled", aux.InternalBotEnabled);
         AppendBool(output, "dynamic_icon_enabled", aux.DynamicIconEnabled);
         AppendText(output, "dynamic_icon_pak_name", aux.DynamicIconPakName);
@@ -181,6 +183,8 @@ public static class ListFileCodec
             case "exp_drift_enabled": aux.ExpDriftEnabled = BooleanText.IsTruthy(value); break;
             case "owner_companion_pass_through": aux.OwnerCompanionPassThrough = BooleanText.IsTruthy(value); break;
             case "other_companion_pass_through": aux.OtherCompanionPassThrough = BooleanText.IsTruthy(value); break;
+            case "range_skill_damage_extension": aux.RangeSkillDamageExtension = BooleanText.IsTruthy(value); break;
+            case "packet_spy_startup_enabled": aux.PacketSpyStartupEnabled = BooleanText.IsTruthy(value); break;
             case "internal_bot_enabled": aux.InternalBotEnabled = BooleanText.IsTruthy(value); break;
 
             case "multi_instance_limit":

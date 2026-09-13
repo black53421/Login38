@@ -66,6 +66,8 @@ public sealed class DamageCaveTests
             0x9C, 0x60,
             0x89, 0x25, Any, Any, Any, Any,
             0x89, 0x15, Any, Any, Any, Any,                 // mov [damage], edx
+            0x83, 0x3D, Any, Any, Any, Any, 0x00,           // cmp dword ptr [enabled], 0
+            0x0F, 0x84, Any, Any, Any, Any,                 // display disabled
             0x8B, 0x55, 0xE4,                               // mov edx, [ebp-0x1C]   who cast it
 
             .. OnlyMine,
@@ -209,7 +211,7 @@ public sealed class DamageCaveTests
     {
         var (code, entries) = DamageCave.Build(Cave, Tick);
 
-        (code.Length - entries.Length).ShouldBe((12 * 4) + DamageCave.TextLength);
+        (code.Length - entries.Length).ShouldBe((13 * 4) + DamageCave.TextLength);
     }
 
     /// <summary>
