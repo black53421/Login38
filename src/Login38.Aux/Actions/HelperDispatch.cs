@@ -41,8 +41,7 @@ public enum DispatchResult
 /// </para>
 /// <para>
 /// Nothing here gates on time or on state. A caller that wants a cooldown keeps its own,
-/// because what a sensible cooldown is differs per feature — a potion's is half a second
-/// and a buff's is two.
+/// because what a sensible cooldown is differs per feature and per action type.
 /// </para>
 /// </remarks>
 public class HelperDispatch
@@ -128,8 +127,9 @@ public class HelperDispatch
         // "Use this on that" — a scroll on a weapon, a whetstone on what is being swung.
         // The server wants both, and using the scroll on its own only opens a target
         // cursor nobody is there to click.
-        if (entry.Cast.Kind is CastKind.OnSelfItem or CastKind.OnInUseItem
-            or CastKind.OnWieldedItem or CastKind.OnNamedItem or CastKind.OnNamedEntity)
+        if (entry.Cast.Kind is CastKind.HoverTarget or CastKind.OnSelfItem
+            or CastKind.OnInUseItem or CastKind.OnWieldedItem or CastKind.OnNamedItem
+            or CastKind.OnNamedEntity)
         {
             return UseOnSomething(process, entry, bag, source);
         }
@@ -168,6 +168,7 @@ public class HelperDispatch
     private uint? TargetOf(RemoteProcess process, HelperEntry entry, IReadOnlyList<InventoryItem> bag) =>
         entry.Cast.Kind switch
         {
+            CastKind.HoverTarget => CurrentTarget(process),
             CastKind.OnSelfItem => SelfId(process),
             CastKind.OnInUseItem => Worn(bag, entry.Cast.Target, i => i.IsInUse)?.Param,
             CastKind.OnWieldedItem => Worn(bag, entry.Cast.Target, i => i.IsWielded)?.Param,
@@ -178,6 +179,9 @@ public class HelperDispatch
             CastKind.OnNamedEntity => Somebody(process, entry.Cast.Target),
             _ => null,
         };
+
+    /// <summary>The id of the entity the client is currently fighting or pointing at.</summary>
+    private uint? CurrentTarget(RemoteProcess process) => _entities.Current(process)?.Id;
 
     /// <summary>The id of whoever is called this, if anyone in sight is.</summary>
     private uint? Somebody(RemoteProcess process, string? name)

@@ -13,13 +13,13 @@ public enum CastKind
     OnSelf,
 
     /// <summary>
-    /// Cast on whatever the mouse is over.
+    /// Act on the client's current world target.
     /// </summary>
     /// <remarks>
-    /// For a skill this behaves as <see cref="NoSpec"/>: this client has no global anyone
-    /// writes the hovered entity to, so there is nothing to read. For an item it is the
-    /// half-manual path — the client enters its own target-picking mode and the player
-    /// clicks.
+    /// For an item, <c>/IT</c> first uses the active attack target and then falls back to
+    /// the client's hover/re-lock target. The stored value is an entity-record pointer,
+    /// not the object id sent to the server, so it must be resolved before the packet is
+    /// built. For a skill this still behaves as <see cref="NoSpec"/>.
     /// </remarks>
     HoverTarget,
 

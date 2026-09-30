@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Login38.Aux.Actions;
 using Login38.Aux.Game;
 using Login38.Aux.Settings;
@@ -26,19 +27,44 @@ public sealed class PotionTask : IAuxTask
     private readonly GameActions _actions;
     private readonly Spells _spells;
     private readonly ILogger<PotionTask> _logger;
+    private readonly Func<TimeSpan> _now;
+    private readonly Func<RemoteProcess, uint?> _selfId;
+
+    private TimeSpan _nextActionAt;
 
     public PotionTask(GameActions actions, Spells spells, ILogger<PotionTask> logger)
+        : this(actions, spells, logger, MonotonicNow(), ReadSelfId)
+    {
+    }
+
+    internal PotionTask(
+        GameActions actions, Spells spells, ILogger<PotionTask> logger, Func<TimeSpan> now,
+        Func<RemoteProcess, uint?>? selfId = null)
     {
         _actions = actions;
         _spells = spells;
         _logger = logger;
+        _now = now ?? throw new ArgumentNullException(nameof(now));
+        _selfId = selfId ?? ReadSelfId;
     }
 
     /// <inheritdoc/>
     public string Name => "potions";
 
-    /// <summary>Twice a second, which is as fast as the client will take a potion anyway.</summary>
-    public TimeSpan Interval => TimeSpan.FromMilliseconds(500);
+    /// <summary>Polls health and mana at the host cadence for fast threshold detection.</summary>
+    public TimeSpan Interval => TimeSpan.FromMilliseconds(100);
+
+    /// <summary>Minimum spacing between two potion-rule actions.</summary>
+    internal static readonly TimeSpan ActionCooldown = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>Monotonic task time.</summary>
+    internal TimeSpan Now => _now();
+
+    private static Func<TimeSpan> MonotonicNow()
+    {
+        var clock = Stopwatch.StartNew();
+        return () => clock.Elapsed;
+    }
 
     /// <inheritdoc/>
     public void Tick(AuxContext context)
@@ -69,17 +95,33 @@ public sealed class PotionTask : IAuxTask
             return;
         }
 
+        var now = Now;
+
+        // Detection stays fast, but actions remain paced independently. The player's gauges
+        // are read on every poll so the first pass after the cooldown expires acts on fresh
+        // state rather than on a decision queued half a second earlier.
+        if (now < _nextActionAt)
+        {
+            return;
+        }
+
         foreach (var rule in rules)
         {
-            if (Crossed(settings, player.HitPoints, rule.Threshold))
+            if (!Crossed(settings, player.HitPoints, rule.Threshold))
             {
-                Drink(context, rule.Item);
+                continue;
+            }
+
+            if (Drink(context, rule.Item))
+            {
+                _nextActionAt = now + ActionCooldown;
+                return;
             }
         }
 
-        if (wantsMana && Safe(settings, player))
+        if (wantsMana && Safe(settings, player) && Drink(context, mana.Item))
         {
-            Drink(context, mana.Item);
+            _nextActionAt = now + ActionCooldown;
         }
     }
 
@@ -112,27 +154,25 @@ public sealed class PotionTask : IAuxTask
     /// happens while a character is being hit, several times in a row, and the packet does
     /// not depend on any client-side state being intact at the moment it arrives.
     /// </remarks>
-    private void Drink(AuxContext context, string text)
+    private bool Drink(AuxContext context, string text)
     {
         var entry = HelperEntrySyntax.Parse(text);
 
-        switch (entry.Kind)
+        return entry.Kind switch
         {
-            case EntryKind.Item:
-                Use(context, entry);
-                break;
-
-            case EntryKind.Skill:
-                Cast(context, entry);
-                break;
-
-            default:
-                _logger.LogInformation("{Text} is not something a potion rule can use", text);
-                break;
-        }
+            EntryKind.Item => Use(context, entry),
+            EntryKind.Skill => Cast(context, entry),
+            _ => Unsupported(text),
+        };
     }
 
-    private void Use(AuxContext context, HelperEntry entry)
+    private bool Unsupported(string text)
+    {
+        _logger.LogInformation("{Text} is not something a potion rule can use", text);
+        return false;
+    }
+
+    private bool Use(AuxContext context, HelperEntry entry)
     {
         if (InventoryReader.FindByName(context.Bag, entry.Name) is not { } item)
         {
@@ -140,13 +180,41 @@ public sealed class PotionTask : IAuxTask
                 "Time to use {Name}, but nothing in the bag of {Count} is called that",
                 entry.Name, context.Bag.Count);
 
-            return;
+            return false;
         }
 
-        _actions.SendUseItem(context.Process, item.Param);
+        switch (entry.Cast.Kind)
+        {
+            case CastKind.Item:
+                _actions.SendUseItem(context.Process, item.Param);
+                return true;
+
+            case CastKind.OnSelfItem:
+                if (_selfId(context.Process) is not { } selfId || selfId == 0)
+                {
+                    _logger.LogInformation(
+                        "Time to use {Name} on self, but the character object id is not ready",
+                        entry.Name);
+
+                    return false;
+                }
+
+                _actions.UseOn(context.Process, item.Param, selfId);
+                return true;
+
+            default:
+                _logger.LogInformation(
+                    "{Name} is aimed somewhere a potion rule cannot follow; only /I and /IME work here",
+                    entry.Name);
+
+                return false;
+        }
     }
 
-    private void Cast(AuxContext context, HelperEntry entry)
+    private static uint? ReadSelfId(RemoteProcess process) =>
+        process.TryRead<uint>(GameFunctions.SelfId, out var id) && id != 0 ? id : null;
+
+    private bool Cast(AuxContext context, HelperEntry entry)
     {
         // Only the two ways of casting on oneself. A potion rule that fired at whatever the
         // mouse happened to be over would be a rule that healed a monster.
@@ -163,16 +231,17 @@ public sealed class PotionTask : IAuxTask
                 "{Name} is aimed somewhere a potion rule cannot follow; only /M and /ME work here",
                 entry.Name);
 
-            return;
+            return false;
         }
 
         if (_spells.Find(context.Process, entry.Name) is not { } packed)
         {
             _logger.LogInformation("Time to cast {Name}, but this character has not learned it", entry.Name);
 
-            return;
+            return false;
         }
 
         _actions.Cast(context.Process, packed, aim.Value);
+        return true;
     }
 }

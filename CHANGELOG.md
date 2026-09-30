@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-09-30 — F-key magic scrolls can use the current target
+
+- Make bare `/IT` resolve the client's current combat target instead of only opening an item target cursor.
+- Prefer the active attack target and fall back to the client's hover/re-lock target.
+- Resolve the client `LEntity*` pointer to the server-facing object id at record offset `+0x0C` before sending `UseOn`.
+- Reject recycled, gone, dying, zero-id, or out-of-heap target records instead of sending a bad target id.
+- Keep `/IT=name` unchanged; it still resolves a named entity through the existing heap scan.
+
+## 2026-09-29 — faster potion and buff reaction
+
+- Poll potion thresholds and buff effect state every 100 ms.
+- Keep potion actions independently paced at 500 ms and allow only one successful potion-rule action per window.
+- Pace helper skill casts independently at 500 ms while preserving the existing per-effect 5 s retry/backoff.
+- Keep item-based helper entries independent from the skill-cast gate.
+- Support potion rules using `/IME` targeted items such as healing scrolls, while keeping `/I`, `/M`, and `/ME` behavior.
+- Pace helper item actions independently at 500 ms so multiple scroll/item buffs cannot burst in one 100 ms poll.
+- Add targeted self-buff scroll choices and the full-heal magic scroll to the default helper lists.
+
+## 2026-09-15 - Diagnostic receive analyzer
+
+- Added an optional Server-to-Client packet recorder in front of the client dispatcher.
+- Added one-shot dispatcher/range-check dumps and `ddhhh` descriptor xref discovery for opcode reverse engineering.
+- The receive recorder shares the existing long-item-status dispatcher router so two detours never compete for the same entry point.
+
+## 2026-09-13 - RangeSkill capability marker fix
+
+- Correct the 3.80C `C_ServerVersion` client-version stack slot from `[esp+0x20]` to `[esp+0x1C]`, based on startup PacketSpy output for `"chdcddc"`.
+- Guard the marker write with the observed caller return address `0x004E0EE1` and opcode `0x0E`.
+- Add a byte-level regression test for the marker cave.
+
 ## 1.1.0
 
 Automatic hunting, and the reason skills used to miss.
@@ -51,9 +81,3 @@ Scaled present, overlay lifetime, client-owned toggles and exit latency.
 ## 1.0.0
 
 First public release.
-
-## 2026-09-13 - RangeSkill capability marker fix
-
-- Correct the 3.80C `C_ServerVersion` client-version stack slot from `[esp+0x20]` to `[esp+0x1C]`, based on startup PacketSpy output for `"chdcddc"`.
-- Guard the marker write with the observed caller return address `0x004E0EE1` and opcode `0x0E`.
-- Add a byte-level regression test for the marker cave.

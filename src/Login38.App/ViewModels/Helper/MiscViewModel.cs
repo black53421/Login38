@@ -47,6 +47,10 @@ public sealed partial class MiscViewModel : ObservableObject
     [ObservableProperty]
     private bool _logSentPackets;
 
+    /// <summary>Write every packet the server sends to the client to the log.</summary>
+    [ObservableProperty]
+    private bool _logReceivedPackets;
+
     /// <summary>Name what goes into the bag, in the corner of the screen.</summary>
     [ObservableProperty]
     private bool _pickupToast;
@@ -68,6 +72,7 @@ public sealed partial class MiscViewModel : ObservableObject
         ShowAttackDamage = misc.ShowAttackDamage;
         DamageAtFeet = misc.DamageAtFeet;
         LogSentPackets = misc.LogSentPackets;
+        LogReceivedPackets = misc.LogReceivedPackets;
         PickupToast = misc.PickupToast;
         GainDrift = misc.GainDrift;
     }
@@ -83,6 +88,7 @@ public sealed partial class MiscViewModel : ObservableObject
         ShowAttackDamage = ShowAttackDamage,
         DamageAtFeet = DamageAtFeet,
         LogSentPackets = LogSentPackets,
+        LogReceivedPackets = LogReceivedPackets,
         PickupToast = PickupToast,
         GainDrift = GainDrift,
     };

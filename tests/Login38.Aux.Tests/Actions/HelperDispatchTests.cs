@@ -110,6 +110,20 @@ public sealed class HelperDispatchTests : IDisposable
     }
 
     [Fact]
+    public void UsesAScrollOnTheCurrentTarget()
+    {
+        _entities.CurrentTarget = 0x6000;
+
+        Send($"{Scroll}/IT", [Item(Scroll, 0x100)]).ShouldBe(DispatchResult.Done);
+
+        _actions.Pairs.ShouldBe([(0x100u, 0x6000u)]);
+    }
+
+    [Fact]
+    public void SaysSoWhenThereIsNoCurrentTarget() =>
+        Send($"{Scroll}/IT", Bag(Scroll)).ShouldBe(DispatchResult.Skipped);
+
+    [Fact]
     public void SaysSoWhenNobodyThereIsCalledThat() =>
         Send($"{Scroll}/IT=某人", Bag(Scroll)).ShouldBe(DispatchResult.Skipped);
 
@@ -266,8 +280,15 @@ public sealed class HelperDispatchTests : IDisposable
     {
         public Dictionary<string, uint> Present { get; } = [];
 
+        public uint? CurrentTarget { get; set; }
+
         /// <summary>How many times the heap was walked.</summary>
         public int Searches { get; private set; }
+
+        public override Entity? Current(RemoteProcess process) =>
+            CurrentTarget is { } id
+                ? new Entity(new GameAddress(0xDEAD1000), id, "current")
+                : null;
 
         public override Entity? Find(RemoteProcess process, string name)
         {

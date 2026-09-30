@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Login38.Aux.Actions;
+using Login38.Aux.Hunt;
 using Login38.Core.Text;
 using Login38.Interop;
 using Microsoft.Extensions.Logging;
@@ -80,6 +81,62 @@ public class EntityScan
     {
         _codec = codec;
         _logger = logger;
+    }
+
+    /// <summary>
+    /// Resolves the entity the client is currently fighting or pointing at.
+    /// </summary>
+    /// <remarks>
+    /// The two client globals hold pointers to entity records, not packet object ids. The
+    /// active attack target is preferred because it is the least ambiguous meaning of
+    /// <c>/IT</c>; the hover/re-lock target is used when there is no active attack. A
+    /// candidate is accepted only while it still looks like a live entity record.
+    /// </remarks>
+    public virtual Entity? Current(RemoteProcess process)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+
+        return CurrentAt(process, HuntAddresses.AttackTarget, "attack")
+            ?? CurrentAt(process, HuntAddresses.HoverTarget, "hover");
+    }
+
+    /// <summary>Reads one current-target pointer and resolves its packet object id.</summary>
+    private Entity? CurrentAt(RemoteProcess process, GameAddress pointer, string source)
+    {
+        if (!process.TryRead<uint>(pointer, out var recordAddress) || recordAddress == 0
+            || recordAddress < HeapStart.Value || recordAddress >= HeapEnd.Value)
+        {
+            return null;
+        }
+
+        Span<byte> record = stackalloc byte[RecordLength];
+        var address = new GameAddress(recordAddress);
+
+        if (!process.TryReadBytes(address, record) || CurrentId(record) is not { } id)
+        {
+            return null;
+        }
+
+        _logger.LogInformation(
+            "Resolved current {Source} target at {Address}, id {Id:X8}", source, address, id);
+
+        return new Entity(address, id, source);
+    }
+
+    /// <summary>Extracts a usable packet target id from a candidate entity record.</summary>
+    internal static uint? CurrentId(ReadOnlySpan<byte> record)
+    {
+        if (record.Length < RecordLength
+            || BitConverter.ToUInt32(record) != Vtable.Value
+            || record[HuntAddresses.EntityIsGone] != 0
+            || record[HuntAddresses.EntityAction] == HuntAddresses.DyingAction)
+        {
+            return null;
+        }
+
+        var id = BitConverter.ToUInt32(record[(int)RecordId..]);
+
+        return id == 0 ? null : id;
     }
 
     /// <summary>

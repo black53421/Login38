@@ -109,6 +109,16 @@ public sealed class MiscToggles
     [JsonPropertyName("log_sent_packets")]
     public bool LogSentPackets { get; set; }
 
+    /// <summary>
+    /// Write every packet the server sends to the client to the log.
+    /// </summary>
+    /// <remarks>
+    /// Diagnostic only. The recorder runs immediately before the client packet dispatcher
+    /// and keeps the first sixteen bytes of each packet.
+    /// </remarks>
+    [JsonPropertyName("log_received_packets")]
+    public bool LogReceivedPackets { get; set; }
+
     /// <summary>Name what goes into the bag, in the bottom-left corner.</summary>
     [JsonPropertyName("pickup_toast")]
     public bool PickupToast { get; set; }

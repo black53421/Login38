@@ -42,6 +42,9 @@ public sealed class HelperTaskTests : IDisposable
     public void Dispose() => _process.Dispose();
 
     [Fact]
+    public void PollsTenTimesASecond() => Task().Interval.ShouldBe(TimeSpan.FromMilliseconds(100));
+
+    [Fact]
     public void SendsAnEntryWhoseEffectIsNotOnTheCharacter() =>
         HelperTask.Due(Item("加速藥水", Haste), Table(), None(), TimeSpan.Zero, false).ShouldBeTrue();
 
@@ -246,11 +249,30 @@ public sealed class HelperTaskTests : IDisposable
         _dispatch.Sent.Count.ShouldBe(1);
     }
 
-    // Several items in one pass, because using one is instant and does not stop the next.
+    // Item actions are paced too: targeted scrolls are still item packets and should not
+    // burst several times just because the effect table is polled every 100 ms.
     [Fact]
-    public void UsesEverythingOnTheListThatIsNotUp()
+    public void UsesOneItemEvenWhenTwoAreDue()
     {
         Task().Tick(Context(Settings(Item("加速藥水", Haste), Item("勇敢藥水", Bravery))));
+
+        _dispatch.Sent.ShouldBe(["加速藥水"]);
+    }
+
+    [Fact]
+    public void KeepsItemActionsHalfASecondApartWhilePollingFaster()
+    {
+        var task = Task();
+        var settings = Settings(Item("加速藥水", Haste), Item("勇敢藥水", Bravery));
+
+        task.Tick(Context(settings));
+        task.Time = HelperTask.ItemActionCooldown - TimeSpan.FromMilliseconds(1);
+        task.Tick(Context(settings));
+
+        _dispatch.Sent.ShouldBe(["加速藥水"]);
+
+        task.Time = HelperTask.ItemActionCooldown;
+        task.Tick(Context(settings));
 
         _dispatch.Sent.ShouldBe(["加速藥水", "勇敢藥水"]);
     }
@@ -264,6 +286,26 @@ public sealed class HelperTaskTests : IDisposable
         Task().Tick(Context(Settings(Skill("加速術", Haste), Skill("勇敢術", Bravery))));
 
         _dispatch.Sent.ShouldBe(["加速術"]);
+    }
+
+    [Fact]
+    public void KeepsSkillActionsHalfASecondApartWhilePollingFaster()
+    {
+        _dispatch.Result = DispatchResult.Cast;
+
+        var task = Task();
+        var settings = Settings(Skill("加速術", Haste), Skill("勇敢術", Bravery));
+
+        task.Tick(Context(settings));
+        task.Time = HelperTask.SkillActionCooldown - TimeSpan.FromMilliseconds(1);
+        task.Tick(Context(settings));
+
+        _dispatch.Sent.ShouldBe(["加速術"]);
+
+        task.Time = HelperTask.SkillActionCooldown;
+        task.Tick(Context(settings));
+
+        _dispatch.Sent.ShouldBe(["加速術", "勇敢術"]);
     }
 
     // A cooldown is for a packet in flight. An entry that sent nothing has nothing in
@@ -347,6 +389,10 @@ public sealed class HelperTaskTests : IDisposable
         : HelperTask(dispatch, logger)
     {
         public BuffState State { get; set; } = state;
+
+        public TimeSpan Time { get; set; }
+
+        internal override TimeSpan Now => Time;
 
         internal override BuffState? Read(RemoteProcess process) => State;
     }

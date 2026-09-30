@@ -1,4 +1,5 @@
 using Login38.Aux.Game;
+using Login38.Aux.Hunt;
 using Login38.Core.Text;
 using Login38.Interop;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -102,6 +103,45 @@ public sealed class EntityScanTests : IDisposable
     public void IsNotThePlayerBeforeTheirRecordCanBeRead() =>
         EntityScan.Yourself(null, 0x4001, Me).ShouldBeNull();
 
+    [Fact]
+    public void ExtractsThePacketIdFromALiveCurrentTargetRecord()
+    {
+        var record = CurrentRecord(0x5001);
+
+        EntityScan.CurrentId(record).ShouldBe(0x5001u);
+    }
+
+    [Fact]
+    public void RejectsARecycledCurrentTargetRecord()
+    {
+        var record = CurrentRecord(0x5001);
+        BitConverter.TryWriteBytes(record, 0xDEADBEEFu);
+
+        EntityScan.CurrentId(record).ShouldBeNull();
+    }
+
+    [Fact]
+    public void RejectsACurrentTargetThatIsGone()
+    {
+        var record = CurrentRecord(0x5001);
+        record[HuntAddresses.EntityIsGone] = 1;
+
+        EntityScan.CurrentId(record).ShouldBeNull();
+    }
+
+    [Fact]
+    public void RejectsACurrentTargetPlayingItsDeath()
+    {
+        var record = CurrentRecord(0x5001);
+        record[HuntAddresses.EntityAction] = HuntAddresses.DyingAction;
+
+        EntityScan.CurrentId(record).ShouldBeNull();
+    }
+
+    [Fact]
+    public void RejectsACurrentTargetWithNoPacketId() =>
+        EntityScan.CurrentId(CurrentRecord(0)).ShouldBeNull();
+
     // From here on the real thing, against a record written into this process: the vtable
     // scan, the field offsets and the name pointers, all as they are read from a client.
     [Fact]
@@ -152,6 +192,16 @@ public sealed class EntityScanTests : IDisposable
         Scan().Find(_process, "沒有這個人").ShouldBeNull();
 
     private static EntityScan Scan() => new(LegacyTextCodec.Auto, NullLogger<EntityScan>.Instance);
+
+    private static byte[] CurrentRecord(uint id)
+    {
+        var record = new byte[EntityScan.RecordLength];
+
+        BitConverter.TryWriteBytes(record, EntityScan.Vtable.Value);
+        BitConverter.TryWriteBytes(record.AsSpan((int)EntityScan.RecordId), id);
+
+        return record;
+    }
 
     private static EntityScan.Candidate Candidate(uint id, params string[] names) =>
         new(new GameAddress(0xABCD0000), id, names);

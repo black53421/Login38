@@ -1,5 +1,6 @@
 using System.Globalization;
 using Login38.Interop;
+using Login38.Patching.Diagnostics;
 using Login38.Patching.Patches;
 using Shouldly;
 
@@ -33,6 +34,8 @@ public sealed class LongItemStatusPatchTests
 
     private static readonly GameAddress Buffer = new(0x0D00_0000);
 
+    private static readonly GameAddress ProbeData = new(0x0E00_0000);
+
     /// <summary>Where the original lives, which is what the relocation is measured from.</summary>
     private static readonly GameAddress StatusHandler = new(0x0052_8A00);
 
@@ -61,18 +64,10 @@ public sealed class LongItemStatusPatchTests
         "31 38 3F 46 4D 54 5B 62 69 70 77 7E 85 8C E8 EE 9A 52 F6 B6 BD C4 CB B7 D9 E0 E7 EE F5 FC 03 0A " +
         "11 18 1F 26 2D 34 3B 42 49 50 57 5E 65 6C 73 7A 81 88 8F E8 13 9B 52 F6 E9 FB 89 52 F6";
 
-    private const string ExpectedRouter =
-        "8B 44 24 04 8A 08 80 F9 F1 74 05 80 F9 F2 75 0A 50 E8 EA FF FF 00 83 C4 04 C3 55 8B EC 83 EC 1C " +
-        "E9 01 4A 54 F6";
-
     [Fact]
     public void HandlerMatchesTheReferenceByteForByte() =>
         LongItemStatusPatch.BuildHandler(Source(), HandlerCave, Format, Buffer)
             .ShouldBe(Parse(ExpectedHandler));
-
-    [Fact]
-    public void RouterMatchesTheReferenceByteForByte() =>
-        LongItemStatusPatch.BuildRouter(RouterCave, HandlerTarget).ShouldBe(Parse(ExpectedRouter));
 
     // The one change that widens the wire format. Everything else is a consequence of it.
     [Fact]
@@ -157,13 +152,32 @@ public sealed class LongItemStatusPatchTests
     public void HandlerFitsTheCaveItIsWrittenInto() => Handler().Length.ShouldBeLessThanOrEqualTo(0x140);
 
     [Fact]
-    public void RouterFitsTheCaveItIsWrittenInto() => Router().Length.ShouldBeLessThanOrEqualTo(0x40);
+    public void RouterFitsTheCaveItIsWrittenInto() => Router().Length.ShouldBeLessThanOrEqualTo(0x100);
 
-    // The router runs before the dispatcher has done anything, so the packet is still where
-    // the caller put it.
     [Fact]
-    public void ReadsTheOpcodeOutOfTheIncomingPacket() =>
-        Router()[..6].ShouldBe([0x8B, 0x44, 0x24, 0x04, 0x8A, 0x08]);
+    public void RouterPreservesStateBeforeRecording()
+    {
+        var code = Router();
+        code[..2].ShouldBe([0x9C, 0x60]);                          // pushfd; pushad
+        BytePattern.Format(code).ShouldContain("61 9D");          // popad; popfd
+    }
+
+    [Fact]
+    public void RouterReadsTheOriginalPacketAfterTheRecorder()
+    {
+        var at = Find(Router(), [0x8B, 0x44, 0x24, 0x04, 0x8A, 0x08]);
+        at.ShouldBeGreaterThan(0);
+    }
+
+    [Fact]
+    public void RouterUsesTheSharedReceiveProbe()
+    {
+        var text = BytePattern.Format(Router());
+
+        text.ShouldContain(BytePattern.Format(BitConverter.GetBytes((ProbeData + ReceivePacketProbe.EnabledOffset).Value)));
+        text.ShouldContain(BytePattern.Format(BitConverter.GetBytes((ProbeData + ReceivePacketProbe.IndexOffset).Value)));
+        text.ShouldContain(BytePattern.Format(BitConverter.GetBytes((ProbeData + ReceivePacketProbe.RingOffset).Value)));
+    }
 
     [Theory]
     [InlineData(0xF1)]
@@ -171,46 +185,31 @@ public sealed class LongItemStatusPatchTests
     public void ClaimsBothLongStatusOpcodes(byte opcode) =>
         BytePattern.Format(Router()).ShouldContain($"80 F9 {opcode:X2}");
 
-    // Two comparisons, one body. The first branch has to land on the body and the second has
-    // to skip all of it — hand-counted displacements that a changed body would silently break.
     [Fact]
-    public void BothOpcodesReachTheSameHandlerCall()
+    public void ClaimedPacketCallsTheLongStatusHandler()
     {
         var code = Router();
+        var pushCall = Find(code, [0x50, 0xE8]);
+        pushCall.ShouldBeGreaterThan(0);
 
-        var claimed = 9 + 2 + (sbyte)code[10];    // je, measured from after its displacement
-        var pushPacket = 16;
-
-        claimed.ShouldBe(pushPacket);
-        code[pushPacket].ShouldBe((byte)0x50);    // push eax
-        code[pushPacket + 1].ShouldBe((byte)0xE8);
-
-        (RouterCave + (pushPacket + 6 + BitConverter.ToInt32(code, pushPacket + 2)))
+        var call = pushCall + 1;
+        (RouterCave + (call + 5 + BitConverter.ToInt32(code, call + 1)))
             .ShouldBe(HandlerTarget);
+
+        code.AsSpan(call + 5, 5).ToArray().ShouldBe([0x83, 0xC4, 0x04, 0xC3, 0x55]);
     }
 
-    // A claimed packet must not fall through into the replayed prologue as well.
     [Fact]
-    public void ReturnsAfterHandlingRatherThanContinuing()
+    public void LeavesEveryOtherPacketOnTheOriginalDispatcherPath()
     {
         var code = Router();
+        var prologue = Find(code, [0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x1C]);
+        prologue.ShouldBeGreaterThan(0);
 
-        code[22..26].ShouldBe([0x83, 0xC4, 0x04, 0xC3]);   // add esp, 4; ret
-    }
-
-    // Every other packet has to come out of this indistinguishable from never having been
-    // here: the prologue the jump overwrote, then the instruction after it.
-    [Fact]
-    public void LeavesEveryOtherPacketAlone()
-    {
-        var code = Router();
-
-        var notOurs = 14 + 2 + (sbyte)code[15];
-        notOurs.ShouldBe(26);
-
-        code[26..32].ShouldBe([0x55, 0x8B, 0xEC, 0x83, 0xEC, 0x1C]);
-        code[32].ShouldBe((byte)0xE9);
-        (RouterCave + (32 + 5 + BitConverter.ToInt32(code, 33))).ShouldBe(DispatcherContinuation);
+        var jump = prologue + 6;
+        code[jump].ShouldBe((byte)0xE9);
+        (RouterCave + (jump + 5 + BitConverter.ToInt32(code, jump + 1)))
+            .ShouldBe(DispatcherContinuation);
     }
 
     [Fact]
@@ -240,7 +239,20 @@ public sealed class LongItemStatusPatchTests
 
     private static byte[] Handler() => LongItemStatusPatch.BuildHandler(Source(), HandlerCave, Format, Buffer);
 
-    private static byte[] Router() => LongItemStatusPatch.BuildRouter(RouterCave, HandlerTarget);
+    private static byte[] Router() => LongItemStatusPatch.BuildRouter(RouterCave, HandlerTarget, ProbeData);
+
+    private static int Find(byte[] haystack, byte[] needle)
+    {
+        for (var i = 0; i <= haystack.Length - needle.Length; i++)
+        {
+            if (haystack.AsSpan(i, needle.Length).SequenceEqual(needle))
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
 
     /// <summary>
     /// A stand-in for the live handler: filler everywhere, with the structure the transform

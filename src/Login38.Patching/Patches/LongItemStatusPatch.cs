@@ -1,4 +1,5 @@
 using Login38.Interop;
+using Login38.Patching.Diagnostics;
 using Microsoft.Extensions.Logging;
 
 namespace Login38.Patching.Patches;
@@ -117,7 +118,7 @@ public sealed class LongItemStatusPatch : IGamePatch
 
     private const int HandlerCaveSize = 0x140;
 
-    private const int RouterCaveSize = 0x40;
+    private const int RouterCaveSize = 0x100;
 
     private readonly ILogger<LongItemStatusPatch> _logger;
 
@@ -145,15 +146,17 @@ public sealed class LongItemStatusPatch : IGamePatch
         var buffer = process.AllocateExecutable(BufferSize);
         var handler = process.AllocateExecutable(HandlerCaveSize);
         var router = process.AllocateExecutable(RouterCaveSize);
+        var receiveProbe = process.AllocateData(ReceivePacketProbe.DataSize);
+        process.WriteBytes(receiveProbe, new byte[ReceivePacketProbe.DataSize]);
 
         _logger.LogInformation(
-            "Long item status prepared: handler at {Handler}, router at {Router}, {Size} byte buffer at {Buffer}",
-            handler, router, BufferSize, buffer);
+            "Long item status prepared: handler at {Handler}, router at {Router}, {Size} byte buffer at {Buffer}, receive probe at {ReceiveProbe}",
+            handler, router, BufferSize, buffer, receiveProbe);
 
         // Not awaited. The handler this copies is decrypted the first time the player looks
         // at any item, which may be long after the launch is otherwise finished.
         _ = Task.Run(
-            () => WatchAsync(process, format, buffer, handler, router, cancellationToken),
+            () => WatchAsync(process, format, buffer, handler, router, receiveProbe, cancellationToken),
             CancellationToken.None);
     }
 
@@ -163,13 +166,14 @@ public sealed class LongItemStatusPatch : IGamePatch
         GameAddress buffer,
         GameAddress handler,
         GameAddress router,
+        GameAddress receiveProbe,
         CancellationToken cancellationToken)
     {
         try
         {
             await DeferredSites.WatchAsync(
                 process, [Dispatcher],
-                _ => Install(process, format, buffer, handler, router),
+                _ => Install(process, format, buffer, handler, router, receiveProbe),
                 "Long item status", _logger,
                 cancellationToken: cancellationToken).ConfigureAwait(false);
         }
@@ -194,7 +198,12 @@ public sealed class LongItemStatusPatch : IGamePatch
     /// handler, which is not a failed patch but a crash.
     /// </remarks>
     private SiteAttempt Install(
-        RemoteProcess process, GameAddress format, GameAddress buffer, GameAddress handler, GameAddress router)
+        RemoteProcess process,
+        GameAddress format,
+        GameAddress buffer,
+        GameAddress handler,
+        GameAddress router,
+        GameAddress receiveProbe)
     {
         Span<byte> prologue = stackalloc byte[DispatcherPrologue.Length];
 
@@ -222,8 +231,9 @@ public sealed class LongItemStatusPatch : IGamePatch
         }
 
         process.WriteCode(handler, BuildHandler(source, handler, format, buffer));
-        process.WriteCode(router, BuildRouter(router, handler));
+        process.WriteCode(router, BuildRouter(router, handler, receiveProbe));
         process.WriteCode(Dispatcher, InlineHook.BuildJump(Dispatcher, router, DispatcherPrologue.Length));
+        ReceivePacketProbe.Register(process.Id, receiveProbe);
 
         _logger.LogInformation("Long item descriptions are now accepted on opcode {Opcode}", LongStatusOpcode);
         return SiteAttempt.Settled;
@@ -321,23 +331,58 @@ public sealed class LongItemStatusPatch : IGamePatch
     /// displaced and a jump back to the instruction after it, which is indistinguishable
     /// from never having been here.
     /// </remarks>
-    internal static byte[] BuildRouter(GameAddress cave, GameAddress handler)
+    internal static byte[] BuildRouter(GameAddress cave, GameAddress handler, GameAddress receiveProbe)
     {
         var code = new ShellcodeBuilder(cave);
 
-        code.Bytes([0x8B, 0x44, 0x24, 0x04])                 // mov eax, [esp+4] — the packet
-            .Bytes([0x8A, 0x08]);                            // mov cl, [eax] — its opcode
+        // The receive recorder shares this entry point with the long-status router. It is
+        // gated by a dword in a data block so enabling diagnostics never rewrites live code.
+        // Save everything first: unlike the original router, the recorder uses flags and
+        // string registers, and ordinary packets must reach the dispatcher bit-for-bit as
+        // if the probe were not present.
+        code.PushFd().PushAd();
 
-        code.Bytes([0x80, 0xF9, LongStatusOpcodeAlternate]); // cmp cl, 0xF1
+        code.Bytes([0x83, 0x3D]).Dword((receiveProbe + ReceivePacketProbe.EnabledOffset).Value).Byte(0x00);
+        var skipRecord = code.NearJump(0x84);                       // je disabled
+
+        code.MovEax(1)
+            .Bytes([0xF0, 0x0F, 0xC1, 0x05]).Dword((receiveProbe + ReceivePacketProbe.IndexOffset).Value)
+            .Bytes([0x89, 0xC3])                                  // mov ebx, eax
+            .Bytes([0x83, 0xE0, ReceivePacketProbe.RingLength - 1])
+            .Bytes([0xC1, 0xE0, 0x05])                            // shl eax, 5 (EntrySize = 32)
+            .Byte(0x05).Dword((receiveProbe + ReceivePacketProbe.RingOffset).Value)
+            .Bytes([0x89, 0xC7]);                                 // mov edi, eax
+
+        // pushfd + pushad moved the dispatcher's return address to [esp+0x24] and its
+        // packet argument to [esp+0x28]. Keep the caller to distinguish entry paths, then
+        // the first sixteen packet bytes. Sixteen covers the expected ddhhh SPOLY payload.
+        code.Bytes([0x8B, 0x4C, 0x24, 0x24])                      // mov ecx, [esp+0x24]
+            .Bytes([0x89, 0x0F])                                 // mov [edi], ecx
+            .Bytes([0x83, 0xC7, ReceivePacketProbe.PacketOffset]) // add edi, 4
+            .Bytes([0x8B, 0x74, 0x24, 0x28])                     // mov esi, [esp+0x28]
+            .MovEcx((uint)(ReceivePacketProbe.PacketBytes / 4))
+            .Cld()
+            .RepMovsd()
+            .Bytes([0x43])                                       // inc ebx; zero means uncommitted
+            .Bytes([0x89, 0x1F]);                                // mov [edi], ebx
+
+        code.MarkLabel(skipRecord)
+            .PopAd()
+            .PopFd();
+
+        code.Bytes([0x8B, 0x44, 0x24, 0x04])                     // mov eax, [esp+4] — the packet
+            .Bytes([0x8A, 0x08]);                                // mov cl, [eax] — its opcode
+
+        code.Bytes([0x80, 0xF9, LongStatusOpcodeAlternate]);     // cmp cl, 0xF1
         var claimed = code.ShortJumpIfZero();
 
-        code.Bytes([0x80, 0xF9, LongStatusOpcode]);          // cmp cl, 0xF2
+        code.Bytes([0x80, 0xF9, LongStatusOpcode]);              // cmp cl, 0xF2
         var notOurs = code.ShortJumpIfNotEqual();
 
         code.MarkLabel(claimed)
-            .Byte(0x50)                                      // push eax
+            .Byte(0x50)                                          // push eax
             .CallTo(handler)
-            .Bytes([0x83, 0xC4, 0x04, 0xC3]);                // add esp, 4; ret
+            .Bytes([0x83, 0xC4, 0x04, 0xC3]);                    // add esp, 4; ret
 
         return code.MarkLabel(notOurs)
                    .Bytes(DispatcherPrologue)

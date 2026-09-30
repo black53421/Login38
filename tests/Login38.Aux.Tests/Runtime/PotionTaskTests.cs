@@ -22,16 +22,19 @@ public sealed class PotionTaskTests : IDisposable
     private const string Red = "紅色藥水";
     private const string Orange = "橘色藥水";
     private const string Blue = "藍色藥水";
+    private const string HealScroll = "魔法卷軸 (初級治癒術)";
 
     /// <summary>A fixed id per item, so what was used can be reported by name.</summary>
     private static readonly Dictionary<string, uint> Ids = new(StringComparer.Ordinal)
     {
-        [Red] = 0x2001, [Orange] = 0x2002, [Blue] = 0x2003,
+        [Red] = 0x2001, [Orange] = 0x2002, [Blue] = 0x2003, [HealScroll] = 0x2004,
     };
 
     private readonly RemoteProcess _process = RemoteProcess.Open((uint)Environment.ProcessId);
     private readonly RecordingActions _actions = new();
     private readonly StubSpells _spells = new();
+    private TimeSpan _now;
+    private uint? _selfId = 0x12345678;
 
     public void Dispose() => _process.Dispose();
 
@@ -74,13 +77,23 @@ public sealed class PotionTaskTests : IDisposable
     }
 
     [Fact]
-    public void ReachesTheLowerRowWhenBothHaveBeenCrossed()
+    public void SendsOnlyOneHealthActionPerCooldown()
     {
         var settings = Settings(Rule(Red, 80), Rule(Orange, 30));
 
         Run(settings, Player(hp: 20, max: 100), Bag(Red, Orange));
 
-        _actions.Used.ShouldBe([Red, Orange]);
+        _actions.Used.ShouldBe([Red]);
+    }
+
+    [Fact]
+    public void TriesTheNextCrossedRuleWhenTheFirstCannotAct()
+    {
+        var settings = Settings(Rule(Red, 80), Rule(Orange, 30));
+
+        Run(settings, Player(hp: 20, max: 100), Bag(Orange));
+
+        _actions.Used.ShouldBe([Orange]);
     }
 
     [Fact]
@@ -199,6 +212,28 @@ public sealed class PotionTaskTests : IDisposable
         _actions.Used.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void UsesATargetedHealingScrollOnTheCharacter()
+    {
+        Run(Settings(Rule($"{HealScroll}/IME", 50)), Player(hp: 10, max: 100), Bag(HealScroll));
+
+        _actions.UsedOn.ShouldBe([(HealScroll, 0x12345678u)]);
+    }
+
+    [Fact]
+    public void FallsThroughWhenTheCharacterIdIsNotReadyForAScroll()
+    {
+        _selfId = null;
+
+        Run(
+            Settings(Rule($"{HealScroll}/IME", 80), Rule(Red, 80)),
+            Player(hp: 10, max: 100),
+            Bag(HealScroll, Red));
+
+        _actions.UsedOn.ShouldBeEmpty();
+        _actions.Used.ShouldBe([Red]);
+    }
+
     // A rule can be a skill rather than an item — a healing spell instead of a potion.
     [Fact]
     public void CastsWhenTheRuleNamesASkill()
@@ -208,6 +243,16 @@ public sealed class PotionTaskTests : IDisposable
         Run(Settings(Rule("治癒術/ME", 50)), Player(hp: 10, max: 100), Bag());
 
         _actions.Casts.ShouldBe([(42u, SkillAim.Self)]);
+    }
+
+    [Fact]
+    public void CastsWithoutAnExplicitTargetWhenTheRuleUsesM()
+    {
+        _spells.Known["治癒術"] = 42;
+
+        Run(Settings(Rule("治癒術/M", 50)), Player(hp: 10, max: 100), Bag());
+
+        _actions.Casts.ShouldBe([(42u, SkillAim.Whatever)]);
     }
 
     // A potion rule that fired at whatever the mouse happened to be over is a rule that
@@ -223,10 +268,29 @@ public sealed class PotionTaskTests : IDisposable
     }
 
     [Fact]
-    public void RunsTwiceASecond() => Task().Interval.ShouldBe(TimeSpan.FromMilliseconds(500));
+    public void PollsTenTimesASecond() => Task().Interval.ShouldBe(TimeSpan.FromMilliseconds(100));
+
+    [Fact]
+    public void KeepsPotionActionsHalfASecondApart()
+    {
+        var task = Task();
+        var context = new StubContext(
+            _process, Settings(Rule(Red, 50)), Player(hp: 10, max: 100), Bag(Red), true);
+
+        task.Tick(context);
+        _now = PotionTask.ActionCooldown - TimeSpan.FromMilliseconds(1);
+        task.Tick(context);
+
+        _actions.Used.Count.ShouldBe(1);
+
+        _now = PotionTask.ActionCooldown;
+        task.Tick(context);
+
+        _actions.Used.Count.ShouldBe(2);
+    }
 
     private PotionTask Task() =>
-        new(_actions, _spells, NullLogger<PotionTask>.Instance);
+        new(_actions, _spells, NullLogger<PotionTask>.Instance, () => _now, _ => _selfId);
 
     private void Run(
         AuxSettings settings, PlayerState player, IReadOnlyList<InventoryItem> bag, bool inWorld = true) =>
@@ -310,14 +374,21 @@ public sealed class PotionTaskTests : IDisposable
     private sealed class RecordingActions() : GameActions(LegacyTextCodec.Auto, NullLogger<GameActions>.Instance)
     {
         private readonly List<uint> _used = [];
+        private readonly List<(uint Source, uint Target)> _usedOn = [];
         private readonly List<(uint Packed, SkillAim Aim)> _cast = [];
 
         /// <summary>What was used, back in the names the test wrote.</summary>
         public IReadOnlyList<string> Used => [.. _used.Select(NameOf)];
 
+        public IReadOnlyList<(string Source, uint Target)> UsedOn =>
+            [.. _usedOn.Select(call => (NameOf(call.Source), call.Target))];
+
         public IReadOnlyList<(uint Packed, SkillAim Aim)> Casts => _cast;
 
         public override void SendUseItem(RemoteProcess process, uint itemId) => _used.Add(itemId);
+
+        public override void UseOn(RemoteProcess process, uint source, uint target) =>
+            _usedOn.Add((source, target));
 
         public override void Cast(
             RemoteProcess process, uint packed, SkillTarget target, GameAddress record = default) =>

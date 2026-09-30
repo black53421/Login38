@@ -93,7 +93,7 @@ has two.
 - **Potions** — drinks when the player is running low, from an item list the operator ships
   in `linhelperZ.ini`.
 - **Buffs** — keeps the player's buffs up.
-- **Hotkeys** — runs a command on F1 to F4.
+- **Hotkeys** — runs a command on F1 to F4; item `/IT` acts directly on the current combat/hover target, for example `魔法卷軸 (光箭)/IT`.
 - **Timers** — runs a command every so often.
 - **Shout** — says the player's messages on a loop.
 - **Disposal** — destroys or drops items the player has marked.

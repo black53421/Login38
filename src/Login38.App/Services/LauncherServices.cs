@@ -139,6 +139,7 @@ public static class LauncherServices
         services.AddScoped<IAuxTask, ExperienceTask>();
         services.AddScoped<IAuxTask, MonsterColourTask>();
         services.AddScoped<IAuxTask, PacketSpyTask>();
+        services.AddScoped<IAuxTask, ReceivePacketSpyTask>();
         services.AddScoped<IAuxTask, NotificationTask>();
         services.AddScoped<IAuxTask, OverlayTask>();
 

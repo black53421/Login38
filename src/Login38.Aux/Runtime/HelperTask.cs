@@ -18,11 +18,9 @@ namespace Login38.Aux.Runtime;
 /// helper can ask "am I hasted" rather than casting on a timer and hoping.
 /// </para>
 /// <para>
-/// Items and skills are treated differently on purpose. Several items can be used in one
-/// pass because using one is instant and does not stop the next. Only one skill goes per
-/// pass, because the client casts one at a time and the server answers the rest with an
-/// error — and an error means the effect byte never gets set, so the helper would try
-/// again immediately, for ever.
+/// Items and skills are paced independently. Each family may send one action every half
+/// second even though the effect table is polled every 100 ms. This keeps fast expiry
+/// detection without letting several scrolls or several skills burst out in one pass.
 /// </para>
 /// <para>
 /// That last sentence is also true across passes, which the cooldown alone does not fix: a
@@ -41,6 +39,12 @@ public class HelperTask : IAuxTask
     /// pass while the first was still in flight.
     /// </remarks>
     internal static readonly TimeSpan Cooldown = TimeSpan.FromSeconds(5);
+
+    /// <summary>Minimum spacing between two skill actions from the helper list.</summary>
+    internal static readonly TimeSpan SkillActionCooldown = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>Minimum spacing between two item actions from the helper list.</summary>
+    internal static readonly TimeSpan ItemActionCooldown = TimeSpan.FromMilliseconds(500);
 
     /// <summary>How many sends in a row may go unanswered before the helper eases off.</summary>
     /// <remarks>
@@ -75,6 +79,8 @@ public class HelperTask : IAuxTask
     private readonly Dictionary<(EntryKind Kind, int StateId), Attempt> _sent = [];
 
     private byte? _class;
+    private TimeSpan _nextSkillActionAt;
+    private TimeSpan _nextItemActionAt;
 
     public HelperTask(HelperDispatch dispatch, ILogger<HelperTask> logger)
     {
@@ -85,8 +91,11 @@ public class HelperTask : IAuxTask
     /// <inheritdoc/>
     public string Name => "buffs";
 
-    /// <summary>Twice a second.</summary>
-    public TimeSpan Interval => TimeSpan.FromMilliseconds(500);
+    /// <summary>Polls the effect table at the host cadence for fast expiry detection.</summary>
+    public TimeSpan Interval => TimeSpan.FromMilliseconds(100);
+
+    /// <summary>Monotonic task time, overridable by tests.</summary>
+    internal virtual TimeSpan Now => _clock.Elapsed;
 
     /// <inheritdoc/>
     public void Tick(AuxContext context)
@@ -110,8 +119,13 @@ public class HelperTask : IAuxTask
             return;
         }
 
-        var now = _clock.Elapsed;
-        var castSomething = false;
+        var now = Now;
+
+        // Polling and actions are deliberately separate. A 100 ms poll notices an expired
+        // effect quickly, while the two gates keep both skill packets and item packets from
+        // bursting. The gates are independent so one family does not unnecessarily stall the
+        // other.
+        var castSomething = now < _nextSkillActionAt;
 
         if (_class != state.Class)
         {
@@ -134,6 +148,11 @@ public class HelperTask : IAuxTask
             if (state.Active(entry.StateId))
             {
                 _sent.Remove(key);
+                continue;
+            }
+
+            if (IsItemAction(entry) && now < _nextItemActionAt)
+            {
                 continue;
             }
 
@@ -174,9 +193,17 @@ public class HelperTask : IAuxTask
             if (result == DispatchResult.Cast)
             {
                 castSomething = true;
+                _nextSkillActionAt = now + SkillActionCooldown;
+            }
+            else if (result == DispatchResult.Done && IsItemAction(entry))
+            {
+                _nextItemActionAt = now + ItemActionCooldown;
             }
         }
     }
+
+    private static bool IsItemAction(HelperEntry entry) =>
+        entry.Kind == EntryKind.Item && entry.Cast.Kind != CastKind.Info;
 
     /// <summary>What the character is currently under the effect of.</summary>
     /// <remarks>
