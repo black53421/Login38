@@ -98,6 +98,7 @@ public sealed class ListFileCodecTests
                 PacketSpyStartupEnabled = false,
                 InventoryLimitValue = 500,
                 ImgLimitValue = 123_456,
+                FunctionKeyCooldownMs = 750,
                 DynamicIconPakName = "999",
                 TransformFileName = "halloween",
                 TextEncoding = TextEncodingMode.Gbk,
@@ -152,6 +153,20 @@ public sealed class ListFileCodecTests
     public void UnparseableLimitsFallBackToTheDefault(string value) =>
         ListFileCodec.Parse($"[aux]\ninventory_limit_value={value}\n")
             .Aux.InventoryLimitValue.ShouldBe(AuxConfig.InventoryLimitBounds.Default);
+
+
+    [Theory]
+    [InlineData("50", 100u)]
+    [InlineData("750", 750u)]
+    [InlineData("9000", 5000u)]
+    public void FunctionKeyCooldownIsClamped(string value, uint expected) =>
+        ListFileCodec.Parse($"[aux]\nfunction_key_cooldown_ms={value}\n")
+            .Aux.FunctionKeyCooldownMs.ShouldBe(expected);
+
+    [Fact]
+    public void OlderConfigGetsDefaultFunctionKeyCooldown() =>
+        ListFileCodec.Parse("[aux]\npacket_encrypt=true\n")
+            .Aux.FunctionKeyCooldownMs.ShouldBe(AuxConfig.FunctionKeyCooldownBounds.Default);
 
     [Fact]
     public void ParsesStartupPacketSpySwitch() =>

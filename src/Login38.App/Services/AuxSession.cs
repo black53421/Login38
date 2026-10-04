@@ -1,6 +1,7 @@
 using Login38.Aux.Game;
 using Login38.Aux.Runtime;
 using Login38.Aux.Settings;
+using Login38.Core.Servers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Login38.App.Services;
@@ -26,11 +27,14 @@ public sealed class AuxSession : IDisposable
     private readonly IServiceScope _scope;
 
     /// <param name="scopes">The launcher's container, to take one game's scope out of.</param>
-    public AuxSession(IServiceScopeFactory scopes)
+    /// <param name="aux">Operator settings for this game session.</param>
+    public AuxSession(IServiceScopeFactory scopes, AuxConfig aux)
     {
         ArgumentNullException.ThrowIfNull(scopes);
+        ArgumentNullException.ThrowIfNull(aux);
 
         _scope = scopes.CreateScope();
+        _scope.ServiceProvider.GetRequiredService<AuxRuntimeOptions>().Load(aux);
         Host = _scope.ServiceProvider.GetRequiredService<AuxHost>();
         Settings = _scope.ServiceProvider.GetRequiredService<AuxSettingsSource>();
         Inventory = _scope.ServiceProvider.GetRequiredService<InventoryWatch>();

@@ -11,7 +11,8 @@ namespace Login38.Aux.Game;
 /// <param name="Address">Where its record is, which is only good until it moves.</param>
 /// <param name="Id">The id a packet aims at.</param>
 /// <param name="Name">The name that matched, as the client stores it.</param>
-public readonly record struct Entity(GameAddress Address, uint Id, string Name);
+public readonly record struct Entity(
+    GameAddress Address, uint Id, string Name, ushort X = 0, ushort Y = 0);
 
 /// <summary>
 /// Turns a character's name into an id a packet can aim at.
@@ -117,10 +118,16 @@ public class EntityScan
             return null;
         }
 
-        _logger.LogInformation(
-            "Resolved current {Source} target at {Address}, id {Id:X8}", source, address, id);
+        if (!TryPacketPosition(record, out var x, out var y))
+        {
+            return null;
+        }
 
-        return new Entity(address, id, source);
+        _logger.LogInformation(
+            "Resolved current {Source} target at {Address}, id {Id:X8}, position {X},{Y}",
+            source, address, id, x, y);
+
+        return new Entity(address, id, source, x, y);
     }
 
     /// <summary>Extracts a usable packet target id from a candidate entity record.</summary>
@@ -137,6 +144,30 @@ public class EntityScan
         var id = BitConverter.ToUInt32(record[(int)RecordId..]);
 
         return id == 0 ? null : id;
+    }
+
+    /// <summary>Extracts coordinates that fit the client's two <c>h</c> packet fields.</summary>
+    internal static bool TryPacketPosition(ReadOnlySpan<byte> record, out ushort x, out ushort y)
+    {
+        x = 0;
+        y = 0;
+
+        if (record.Length < RecordLength)
+        {
+            return false;
+        }
+
+        var rawX = BitConverter.ToInt32(record[HuntAddresses.EntityX..]);
+        var rawY = BitConverter.ToInt32(record[HuntAddresses.EntityY..]);
+
+        if ((uint)rawX > ushort.MaxValue || (uint)rawY > ushort.MaxValue)
+        {
+            return false;
+        }
+
+        x = (ushort)rawX;
+        y = (ushort)rawY;
+        return true;
     }
 
     /// <summary>
@@ -238,7 +269,7 @@ public class EntityScan
             {
                 if (string.Equals(name, needle, StringComparison.Ordinal))
                 {
-                    return new Entity(candidate.Address, candidate.Id, name);
+                    return new Entity(candidate.Address, candidate.Id, name, candidate.X, candidate.Y);
                 }
             }
         }
@@ -249,7 +280,7 @@ public class EntityScan
             {
                 if (name.Length >= ShortestPrefix && needle.StartsWith(name, StringComparison.Ordinal))
                 {
-                    return new Entity(candidate.Address, candidate.Id, name);
+                    return new Entity(candidate.Address, candidate.Id, name, candidate.X, candidate.Y);
                 }
             }
         }
@@ -306,7 +337,7 @@ public class EntityScan
         }
 
         return candidate.Names.Any(name => string.Equals(name, needle, StringComparison.Ordinal))
-            ? new Entity(candidate.Address, selfId, needle)
+            ? new Entity(candidate.Address, selfId, needle, candidate.X, candidate.Y)
             : null;
     }
 
@@ -368,7 +399,12 @@ public class EntityScan
             }
         }
 
-        return names.Count == 0 ? null : new Candidate(address, id, names);
+        if (names.Count == 0 || !TryPacketPosition(record, out var x, out var y))
+        {
+            return null;
+        }
+
+        return new Candidate(address, id, names, x, y);
     }
 
     /// <summary>
@@ -401,5 +437,8 @@ public class EntityScan
     /// <param name="Address">Where the record is.</param>
     /// <param name="Id">The id a packet aims at.</param>
     /// <param name="Names">Whichever of the three name fields were filled in.</param>
-    public readonly record struct Candidate(GameAddress Address, uint Id, IReadOnlyList<string> Names);
+    /// <param name="X">The X coordinate sent with entity-targeted item packets.</param>
+    /// <param name="Y">The Y coordinate sent with entity-targeted item packets.</param>
+    public readonly record struct Candidate(
+        GameAddress Address, uint Id, IReadOnlyList<string> Names, ushort X = 0, ushort Y = 0);
 }

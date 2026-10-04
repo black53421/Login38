@@ -112,6 +112,24 @@ public sealed class EntityScanTests : IDisposable
     }
 
     [Fact]
+    public void ExtractsPacketCoordinatesFromTheCurrentTargetRecord()
+    {
+        var record = CurrentRecord(0x5001, 32635, 32822);
+
+        EntityScan.TryPacketPosition(record, out var x, out var y).ShouldBeTrue();
+        x.ShouldBe((ushort)32635);
+        y.ShouldBe((ushort)32822);
+    }
+
+    [Fact]
+    public void RejectsCoordinatesThatCannotFitTheClientsHFields()
+    {
+        var record = CurrentRecord(0x5001, -1, 32822);
+
+        EntityScan.TryPacketPosition(record, out _, out _).ShouldBeFalse();
+    }
+
+    [Fact]
     public void RejectsARecycledCurrentTargetRecord()
     {
         var record = CurrentRecord(0x5001);
@@ -193,12 +211,14 @@ public sealed class EntityScanTests : IDisposable
 
     private static EntityScan Scan() => new(LegacyTextCodec.Auto, NullLogger<EntityScan>.Instance);
 
-    private static byte[] CurrentRecord(uint id)
+    private static byte[] CurrentRecord(uint id, int x = 0, int y = 0)
     {
         var record = new byte[EntityScan.RecordLength];
 
         BitConverter.TryWriteBytes(record, EntityScan.Vtable.Value);
         BitConverter.TryWriteBytes(record.AsSpan((int)EntityScan.RecordId), id);
+        BitConverter.TryWriteBytes(record.AsSpan(HuntAddresses.EntityX), x);
+        BitConverter.TryWriteBytes(record.AsSpan(HuntAddresses.EntityY), y);
 
         return record;
     }

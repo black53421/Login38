@@ -66,6 +66,8 @@ public static class LauncherServices
         services.AddSingleton<ItemCatalog>();
 
         services.AddScoped<AuxSettingsSource>();
+        services.AddScoped<AuxRuntimeOptions>();
+        services.AddScoped<AuxWakeSignal>();
         services.AddScoped<AuxHost>();
 
         // Whether the player has started the helper on this game. Scoped, so a launcher

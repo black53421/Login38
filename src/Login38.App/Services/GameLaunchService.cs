@@ -113,7 +113,7 @@ public sealed class GameLaunchService
                 ConnectTarget = relay?.Endpoint,
             };
 
-            aux = new AuxSession(_scopes);
+            aux = new AuxSession(_scopes, request.Aux);
 
             var session = new GameSession(
                 game, slot, context, _pipeline, aux, _loggerFactory.CreateLogger<GameSession>(),

@@ -41,6 +41,14 @@ public sealed class AuxConfig
         public const uint Max = 500_000;
     }
 
+    /// <summary>Bounds for <see cref="FunctionKeyCooldownMs"/>.</summary>
+    public static class FunctionKeyCooldownBounds
+    {
+        public const uint Default = 500;
+        public const uint Min = 100;
+        public const uint Max = 5_000;
+    }
+
     /// <summary>Encrypt packets to the server.</summary>
     public bool PacketEncrypt { get; set; }
 
@@ -116,6 +124,9 @@ public sealed class AuxConfig
     public uint InventoryLimitValue { get; set; } = InventoryLimitBounds.Default;
 
     public uint ImgLimitValue { get; set; } = ImgLimitBounds.Default;
+
+    /// <summary>Minimum interval between repeated F1-F4 macro executions, in milliseconds.</summary>
+    public uint FunctionKeyCooldownMs { get; set; } = FunctionKeyCooldownBounds.Default;
 
     /// <summary>Base name of the custom icon pak, e.g. <c>"123"</c> for <c>123.pak</c>/<c>123.idx</c>.</summary>
     public string DynamicIconPakName { get; set; } = "123";

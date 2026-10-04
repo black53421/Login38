@@ -108,6 +108,7 @@ public static class ListFileCodec
         AppendBool(output, "img_limit_enabled", aux.ImgLimitEnabled);
         AppendUInt(output, "inventory_limit_value", aux.InventoryLimitValue);
         AppendUInt(output, "img_limit_value", aux.ImgLimitValue);
+        AppendUInt(output, "function_key_cooldown_ms", aux.FunctionKeyCooldownMs);
         AppendText(output, "text_encoding", aux.TextEncoding.ToConfigValue());
         AppendBool(output, "dynamic_dialog_enabled", aux.DynamicDialogEnabled);
         AppendBool(output, "pickup_toast_enabled", aux.PickupToastEnabled);
@@ -200,6 +201,11 @@ public static class ListFileCodec
             case "img_limit_value":
                 aux.ImgLimitValue = ParseClamped(
                     value, AuxConfig.ImgLimitBounds.Default, AuxConfig.ImgLimitBounds.Min, AuxConfig.ImgLimitBounds.Max);
+                break;
+
+            case "function_key_cooldown_ms":
+                aux.FunctionKeyCooldownMs = ParseClamped(
+                    value, AuxConfig.FunctionKeyCooldownBounds.Default, AuxConfig.FunctionKeyCooldownBounds.Min, AuxConfig.FunctionKeyCooldownBounds.Max);
                 break;
 
             case "text_encoding":

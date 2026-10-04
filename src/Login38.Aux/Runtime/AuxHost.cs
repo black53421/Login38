@@ -14,9 +14,8 @@ public interface IAuxTask
 
     /// <summary>How often it wants to run.</summary>
     /// <remarks>
-    /// Rounded up to the loop's own cadence, so this is "no more often than" rather than a
-    /// promise. Nothing here needs to be exact — the fastest of them is a display that
-    /// updates ten times a second.
+    /// Normally rounded up to the loop's baseline cadence. Event-driven tasks may request
+    /// an early pass; their own due time still decides whether they run on that pass.
     /// </remarks>
     TimeSpan Interval { get; }
 
@@ -87,10 +86,10 @@ public interface IAuxTaskSwitchOff
 /// </remarks>
 public sealed class AuxHost
 {
-    /// <summary>How often the loop wakes up.</summary>
+    /// <summary>The baseline cadence for polling tasks.</summary>
     /// <remarks>
-    /// The shortest interval any task asks for. Everything slower is a multiple of it,
-    /// counted rather than slept on separately.
+    /// Latency-sensitive events may wake the same loop earlier. Early wakes do not move
+    /// this cadence, so ordinary polling tasks keep their existing schedule.
     /// </remarks>
     public static readonly TimeSpan Cadence = TimeSpan.FromMilliseconds(100);
 
@@ -98,6 +97,7 @@ public sealed class AuxHost
     private readonly AuxSettingsSource _settings;
     private readonly ILegacyTextCodec _codec;
     private readonly HelperSwitch _switch;
+    private readonly AuxWakeSignal _wake;
     private readonly ILogger<AuxHost> _logger;
 
     public AuxHost(
@@ -105,12 +105,14 @@ public sealed class AuxHost
         AuxSettingsSource settings,
         ILegacyTextCodec codec,
         HelperSwitch helperSwitch,
+        AuxWakeSignal wake,
         ILogger<AuxHost> logger)
     {
         _tasks = [.. tasks];
         _settings = settings;
         _codec = codec;
         _switch = helperSwitch;
+        _wake = wake;
         _logger = logger;
     }
 
@@ -135,15 +137,13 @@ public sealed class AuxHost
             "Helper watching for Home; features on the switch: {Tasks}",
             string.Join(", ", _tasks.Select(t => t.Name)));
 
-        using var timer = new PeriodicTimer(Cadence);
         var clock = Stopwatch.StartNew();
+        var nextCadence = Cadence;
         var helperWasOn = _switch.IsOn;
 
         try
         {
-            // The first pass runs before the first wait, so a game that is already up is
-            // acted on now rather than a cadence from now.
-            do
+            while (true)
             {
                 if (!process.IsRunning)
                 {
@@ -151,11 +151,26 @@ public sealed class AuxHost
                     return;
                 }
 
+                var now = clock.Elapsed;
+
+                // Advance the baseline only when this pass actually started on or after the
+                // cadence boundary. An early hotkey pass that merely crosses the boundary
+                // while doing its work must not skip the polling pass that was due there.
+                while (nextCadence <= now)
+                {
+                    nextCadence += Cadence;
+                }
+
                 ObserveSwitchOff(process, ref helperWasOn);
-                RunDueTasks(schedule, process, clock.Elapsed);
+                RunDueTasks(schedule, process, now);
                 ObserveSwitchOff(process, ref helperWasOn);
+
+                // An early hotkey wake does not move the general 100 ms cadence forward.
+                // If this pass itself crossed the next boundary, the non-positive timeout
+                // makes the loop run again immediately and service polling tasks at once.
+                await _wake.WaitAsync(nextCadence - clock.Elapsed, cancellationToken)
+                    .ConfigureAwait(false);
             }
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false));
         }
         catch (OperationCanceledException)
         {

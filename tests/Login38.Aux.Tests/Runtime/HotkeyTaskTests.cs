@@ -14,6 +14,8 @@ namespace Login38.Aux.Tests.Runtime;
 /// </remarks>
 public sealed class HotkeyTaskTests
 {
+    private static readonly TimeSpan Cooldown = TimeSpan.FromMilliseconds(500);
+
     [Theory]
     [InlineData(0x70, 0)]
     [InlineData(0x71, 1)]
@@ -30,30 +32,39 @@ public sealed class HotkeyTaskTests
     // against a press that never happened.
     [Fact]
     public void LetsARowFireTheFirstTime() =>
-        HotkeyTask.Ready(null, TimeSpan.Zero).ShouldBeTrue();
+        HotkeyTask.Ready(null, TimeSpan.Zero, TimeSpan.FromMilliseconds(500)).ShouldBeTrue();
 
     // A key held down repeats about thirty times a second, and each repeat is a press as
     // far as the hook is concerned. Without this, leaning on F1 empties a bag.
     [Fact]
     public void HoldsARowBackWhileTheKeyIsStillDown() =>
-        HotkeyTask.Ready(TimeSpan.Zero, TimeSpan.FromMilliseconds(499)).ShouldBeFalse();
+        HotkeyTask.Ready(TimeSpan.Zero, TimeSpan.FromMilliseconds(499), TimeSpan.FromMilliseconds(500)).ShouldBeFalse();
 
     [Fact]
     public void LetsItFireAgainAfterHalfASecond() =>
-        HotkeyTask.Ready(TimeSpan.Zero, TimeSpan.FromMilliseconds(500)).ShouldBeTrue();
+        HotkeyTask.Ready(TimeSpan.Zero, TimeSpan.FromMilliseconds(500), TimeSpan.FromMilliseconds(500)).ShouldBeTrue();
+
+    [Fact]
+    public void UsesTheConfiguredCooldown()
+    {
+        var cooldown = TimeSpan.FromMilliseconds(250);
+
+        HotkeyTask.Ready(TimeSpan.Zero, TimeSpan.FromMilliseconds(249), cooldown).ShouldBeFalse();
+        HotkeyTask.Ready(TimeSpan.Zero, TimeSpan.FromMilliseconds(250), cooldown).ShouldBeTrue();
+    }
 
     [Fact]
     public void TakesThePressOnARowWithSomethingBoundToIt()
     {
         var wanted = Pressed(1);
 
-        HotkeyTask.Take(Macros("", "加速術/ME"), wanted, Never(), TimeSpan.Zero).ShouldBe(1);
+        HotkeyTask.Take(Macros("", "加速術/ME"), wanted, Never(), TimeSpan.Zero, Cooldown).ShouldBe(1);
         wanted[1].ShouldBeFalse();
     }
 
     [Fact]
     public void HasNothingToTakeWhenNothingWasPressed() =>
-        HotkeyTask.Take(Macros("加速術/ME"), Pressed(), Never(), TimeSpan.Zero).ShouldBeNull();
+        HotkeyTask.Take(Macros("加速術/ME"), Pressed(), Never(), TimeSpan.Zero, Cooldown).ShouldBeNull();
 
     // Forgotten rather than held: binding something to that key later should not fire it
     // the moment it is bound.
@@ -62,7 +73,7 @@ public sealed class HotkeyTaskTests
     {
         var wanted = Pressed(0);
 
-        HotkeyTask.Take(Macros(""), wanted, Never(), TimeSpan.Zero).ShouldBeNull();
+        HotkeyTask.Take(Macros(""), wanted, Never(), TimeSpan.Zero, Cooldown).ShouldBeNull();
         wanted[0].ShouldBeFalse();
     }
 
@@ -72,7 +83,7 @@ public sealed class HotkeyTaskTests
         var macros = Macros("加速術/ME");
         macros[0].Enabled = false;
 
-        HotkeyTask.Take(macros, Pressed(0), Never(), TimeSpan.Zero).ShouldBeNull();
+        HotkeyTask.Take(macros, Pressed(0), Never(), TimeSpan.Zero, Cooldown).ShouldBeNull();
     }
 
     [Fact]
@@ -81,7 +92,7 @@ public sealed class HotkeyTaskTests
         var fired = Never();
         fired[0] = TimeSpan.Zero;
 
-        HotkeyTask.Take(Macros("加速術/ME"), Pressed(0), fired, TimeSpan.FromMilliseconds(100))
+        HotkeyTask.Take(Macros("加速術/ME"), Pressed(0), fired, TimeSpan.FromMilliseconds(100), Cooldown)
             .ShouldBeNull();
     }
 
@@ -92,7 +103,7 @@ public sealed class HotkeyTaskTests
     {
         var wanted = Pressed(0, 1);
 
-        HotkeyTask.Take(Macros("加速術/ME", "治癒術/ME"), wanted, Never(), TimeSpan.Zero).ShouldBe(0);
+        HotkeyTask.Take(Macros("加速術/ME", "治癒術/ME"), wanted, Never(), TimeSpan.Zero, Cooldown).ShouldBe(0);
 
         wanted[1].ShouldBeTrue();
     }

@@ -46,6 +46,7 @@ public sealed class AuxViewModelTests
             InternalBotEnabled = true,
             MultiInstance = true,
             MultiInstanceLimit = 4,
+            FunctionKeyCooldownMs = 750,
             TextEncoding = TextEncodingMode.Gbk,
         };
 
@@ -79,6 +80,7 @@ public sealed class AuxViewModelTests
         back.InternalBotEnabled.ShouldBeTrue();
         back.MultiInstance.ShouldBeTrue();
         back.MultiInstanceLimit.ShouldBe(4u);
+        back.FunctionKeyCooldownMs.ShouldBe(750u);
         back.TextEncoding.ShouldBe(TextEncodingMode.Gbk);
     }
 
@@ -130,6 +132,18 @@ public sealed class AuxViewModelTests
         var model = new AuxViewModel { CopyLimit = given };
 
         model.ToConfig().MultiInstanceLimit.ShouldBe(expected);
+    }
+
+
+    [Theory]
+    [InlineData(50, 100u)]
+    [InlineData(750, 750u)]
+    [InlineData(9000, 5000u)]
+    public void BoundsTheFunctionKeyCooldown(double given, uint expected)
+    {
+        var model = new AuxViewModel { FunctionKeyCooldown = given };
+
+        model.ToConfig().FunctionKeyCooldownMs.ShouldBe(expected);
     }
 
     // The launcher opens this by name, and an empty one would have it look for `.pak`.

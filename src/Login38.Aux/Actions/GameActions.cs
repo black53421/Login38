@@ -94,6 +94,23 @@ public class GameActions
             PacketArgument.Number(source),
             PacketArgument.Number(target)), nameof(UseOn));
 
+    /// <summary>Uses an item on an entity standing in the world.</summary>
+    /// <remarks>
+    /// PacketSpy shows entity-targeted magic scrolls use <c>cddhhc</c>: source id,
+    /// target id, target X/Y, then a zero byte. Item-on-item actions continue to use
+    /// <c>cdd</c>; the two packet forms are not interchangeable.
+    /// </remarks>
+    public virtual void UseOnEntity(
+        RemoteProcess process, uint source, uint target, ushort x, ushort y) =>
+        Run(process, PacketCall.Send(
+            "cddhhc"u8,
+            PacketArgument.Number(GameFunctions.UseItemOpcode),
+            PacketArgument.Number(source),
+            PacketArgument.Number(target),
+            PacketArgument.Number(x),
+            PacketArgument.Number(y),
+            PacketArgument.Number(0)), nameof(UseOnEntity));
+
     /// <summary>Uses a scroll that needs to be told what to turn into.</summary>
     /// <param name="choice">What to become, as the client spells it.</param>
     public virtual void UseWithOption(RemoteProcess process, uint itemId, string choice)

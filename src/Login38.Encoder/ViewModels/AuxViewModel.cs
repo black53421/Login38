@@ -171,6 +171,9 @@ public sealed partial class AuxViewModel : ObservableObject
     private double _copyLimit = AuxConfig.MultiInstanceLimitBounds.Default;
 
     [ObservableProperty]
+    private double _functionKeyCooldown = AuxConfig.FunctionKeyCooldownBounds.Default;
+
+    [ObservableProperty]
     private TextEncodingMode _encoding = TextEncodingMode.Big5;
 
     partial void OnRangeSkillDamageExtensionChanged(bool value)
@@ -219,6 +222,7 @@ public sealed partial class AuxViewModel : ObservableObject
         InternalBot = aux.InternalBotEnabled;
         MultipleCopies = aux.MultiInstance;
         CopyLimit = aux.MultiInstanceLimit;
+        FunctionKeyCooldown = aux.FunctionKeyCooldownMs;
         Encoding = aux.TextEncoding;
     }
 
@@ -256,6 +260,8 @@ public sealed partial class AuxViewModel : ObservableObject
         MultiInstance = MultipleCopies,
         MultiInstanceLimit = Bounded(
             CopyLimit, AuxConfig.MultiInstanceLimitBounds.Min, AuxConfig.MultiInstanceLimitBounds.Max),
+        FunctionKeyCooldownMs = Bounded(
+            FunctionKeyCooldown, AuxConfig.FunctionKeyCooldownBounds.Min, AuxConfig.FunctionKeyCooldownBounds.Max),
         TextEncoding = Encoding,
     }.Normalized();
 

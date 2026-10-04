@@ -1,4 +1,21 @@
+## 2026-10-01
+
+### F1-F4 input latency
+
+- Wake the existing AuxHost action thread immediately for each watched F1-F4 key-down, instead of waiting up to the 100 ms polling cadence.
+- Keep Windows keyboard auto-repeat as the held-key event source; `function_key_cooldown_ms` remains the minimum action interval.
+- Do not create a separate repeat timer or action thread, avoiding the pacing regression found in the previous event-driven experiment.
+
 # Changelog
+
+- F1～F4 巨集重複觸發間隔改由 Encoder 的 `function_key_cooldown_ms` 設定；預設 500 ms，可調 100～5000 ms，並以每個 game session 的 server config 個別套用。
+
+## 2026-09-30 — entity-targeted magic scroll packet fix
+
+- Match the client PacketSpy format for world-targeted magic scrolls: `cddhhc`, not `cdd`.
+- Send the scroll object id, target object id, target X/Y, and the observed trailing zero byte.
+- Read entity X/Y from record offsets `+0x34/+0x38` and reject coordinates that do not fit the packet's 16-bit `h` fields.
+- Apply the entity packet only to `/IT` and `/IT=name`; keep `/IME`, `/IA`, `/IW`, and `/I=name` on the existing item-target `cdd` packet.
 
 ## 2026-09-30 — F-key magic scrolls can use the current target
 

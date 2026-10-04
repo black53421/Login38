@@ -102,21 +102,25 @@ public sealed class HelperDispatchTests : IDisposable
     [Fact]
     public void UsesAScrollOnSomebodyStandingThere()
     {
-        _entities.Present["某人"] = 0x5000;
+        _entities.Present["某人"] = new Entity(
+            new GameAddress(0xDEAD0000), 0x5000, "某人", 32635, 32822);
 
         Send($"{Scroll}/IT=某人", [Item(Scroll, 0x100)]).ShouldBe(DispatchResult.Done);
 
-        _actions.Pairs.ShouldBe([(0x100u, 0x5000u)]);
+        _actions.EntityUses.ShouldBe([(0x100u, 0x5000u, (ushort)32635, (ushort)32822)]);
+        _actions.Pairs.ShouldBeEmpty();
     }
 
     [Fact]
     public void UsesAScrollOnTheCurrentTarget()
     {
-        _entities.CurrentTarget = 0x6000;
+        _entities.CurrentTarget = new Entity(
+            new GameAddress(0xDEAD1000), 0x6000, "current", 32636, 32821);
 
         Send($"{Scroll}/IT", [Item(Scroll, 0x100)]).ShouldBe(DispatchResult.Done);
 
-        _actions.Pairs.ShouldBe([(0x100u, 0x6000u)]);
+        _actions.EntityUses.ShouldBe([(0x100u, 0x6000u, (ushort)32636, (ushort)32821)]);
+        _actions.Pairs.ShouldBeEmpty();
     }
 
     [Fact]
@@ -133,7 +137,8 @@ public sealed class HelperDispatchTests : IDisposable
     [Fact]
     public void DoesNotGoLookingWhenTheScrollIsNotInTheBag()
     {
-        _entities.Present["某人"] = 0x5000;
+        _entities.Present["某人"] = new Entity(
+            new GameAddress(0xDEAD0000), 0x5000, "某人", 32635, 32822);
 
         Send($"{Scroll}/IT=某人", Bag(Sword)).ShouldBe(DispatchResult.Skipped);
 
@@ -237,6 +242,7 @@ public sealed class HelperDispatchTests : IDisposable
         private readonly List<uint> _used = [];
         private readonly List<uint> _sent = [];
         private readonly List<(uint Source, uint Target)> _pairs = [];
+        private readonly List<(uint Source, uint Target, ushort X, ushort Y)> _entityUses = [];
         private readonly List<(uint Packed, SkillAim Aim)> _casts = [];
         private readonly List<uint> _castTargets = [];
 
@@ -245,6 +251,8 @@ public sealed class HelperDispatchTests : IDisposable
         public List<uint> Sent => _sent;
 
         public List<(uint Source, uint Target)> Pairs => _pairs;
+
+        public List<(uint Source, uint Target, ushort X, ushort Y)> EntityUses => _entityUses;
 
         public List<(uint Packed, SkillAim Aim)> Casts => _casts;
 
@@ -256,6 +264,10 @@ public sealed class HelperDispatchTests : IDisposable
 
         public override void UseOn(RemoteProcess process, uint source, uint target) =>
             _pairs.Add((source, target));
+
+        public override void UseOnEntity(
+            RemoteProcess process, uint source, uint target, ushort x, ushort y) =>
+            _entityUses.Add((source, target, x, y));
 
         public override void Cast(
             RemoteProcess process, uint packed, SkillTarget target, GameAddress record = default)
@@ -278,25 +290,20 @@ public sealed class HelperDispatchTests : IDisposable
     private sealed class StubEntities()
         : EntityScan(LegacyTextCodec.Auto, NullLogger<EntityScan>.Instance)
     {
-        public Dictionary<string, uint> Present { get; } = [];
+        public Dictionary<string, Entity> Present { get; } = [];
 
-        public uint? CurrentTarget { get; set; }
+        public Entity? CurrentTarget { get; set; }
 
         /// <summary>How many times the heap was walked.</summary>
         public int Searches { get; private set; }
 
-        public override Entity? Current(RemoteProcess process) =>
-            CurrentTarget is { } id
-                ? new Entity(new GameAddress(0xDEAD1000), id, "current")
-                : null;
+        public override Entity? Current(RemoteProcess process) => CurrentTarget;
 
         public override Entity? Find(RemoteProcess process, string name)
         {
             Searches++;
 
-            return Present.TryGetValue(name, out var id)
-                ? new Entity(new GameAddress(0xDEAD0000), id, name)
-                : null;
+            return Present.TryGetValue(name, out var entity) ? entity : null;
         }
     }
 }

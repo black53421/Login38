@@ -166,7 +166,13 @@ public sealed class AuxHostTests : IDisposable
     private static AuxHost Host(IAuxTask[] tasks) => Host(tasks, Started());
 
     private static AuxHost Host(IAuxTask[] tasks, HelperSwitch helperSwitch) =>
-        new(tasks, new AuxSettingsSource(), LegacyTextCodec.Auto, helperSwitch, NullLogger<AuxHost>.Instance);
+        new(
+            tasks,
+            new AuxSettingsSource(),
+            LegacyTextCodec.Auto,
+            helperSwitch,
+            new AuxWakeSignal(),
+            NullLogger<AuxHost>.Instance);
 
     private static HelperSwitch Started()
     {

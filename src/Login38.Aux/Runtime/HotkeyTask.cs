@@ -27,17 +27,9 @@ public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
     /// <summary>F1 through F4.</summary>
     internal static readonly int[] Keys = [0x70, 0x71, 0x72, 0x73];
 
-    /// <summary>
-    /// How long a key is ignored for after it has fired.
-    /// </summary>
-    /// <remarks>
-    /// A key held down repeats about thirty times a second, and every one of those is a
-    /// press as far as the hook is concerned. Without this, leaning on F1 would empty a
-    /// bag.
-    /// </remarks>
-    internal static readonly TimeSpan Cooldown = TimeSpan.FromMilliseconds(500);
-
     private readonly HelperDispatch _dispatch;
+    private readonly AuxRuntimeOptions _options;
+    private readonly AuxWakeSignal _wake;
     private readonly ILogger<HotkeyTask> _logger;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly TimeSpan?[] _lastFired = new TimeSpan?[AuxSettings.FunctionKeyMacros];
@@ -46,9 +38,15 @@ public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
     private KeyboardHook? _hook;
     private bool _tried;
 
-    public HotkeyTask(HelperDispatch dispatch, ILogger<HotkeyTask> logger)
+    public HotkeyTask(
+        HelperDispatch dispatch,
+        AuxRuntimeOptions options,
+        AuxWakeSignal wake,
+        ILogger<HotkeyTask> logger)
     {
         _dispatch = dispatch;
+        _options = options;
+        _wake = wake;
         _logger = logger;
     }
 
@@ -56,13 +54,14 @@ public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
     public string Name => "hotkeys";
 
     /// <summary>
-    /// Every pass.
+    /// Runs on every helper pass, including passes woken early by a function-key event.
     /// </summary>
     /// <remarks>
-    /// This is the one thing here a person is waiting on. A tenth of a second between the
-    /// key going down and the packet going out is not noticeable; half a second is.
+    /// The keyboard hook wakes the same helper thread immediately, so the first action does
+    /// not wait for the normal 100 ms cadence. Windows key-repeat remains the source of held
+    /// presses; the Encoder cooldown still decides which repeats are allowed to fire.
     /// </remarks>
-    public TimeSpan Interval => AuxHost.Cadence;
+    public TimeSpan Interval => TimeSpan.Zero;
 
     /// <inheritdoc/>
     public void Tick(AuxContext context)
@@ -134,8 +133,8 @@ public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
     /// A row that has never fired may fire at once — the cooldown is against a key being
     /// held, not against the first press after the game starts.
     /// </remarks>
-    internal static bool Ready(TimeSpan? lastFired, TimeSpan now) =>
-        lastFired is not { } last || now - last >= Cooldown;
+    internal static bool Ready(TimeSpan? lastFired, TimeSpan now, TimeSpan cooldown) =>
+        lastFired is not { } last || now - last >= cooldown;
 
     /// <summary>
     /// Installs the hook, once.
@@ -161,7 +160,7 @@ public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
 
         try
         {
-            _hook = KeyboardHook.Install(Keys, context.Process.Id);
+            _hook = KeyboardHook.Install(Keys, context.Process.Id, _wake.Signal);
 
             _logger.LogInformation("F1 to F4 are being watched for in the game");
 
@@ -199,7 +198,7 @@ public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
     {
         var now = _clock.Elapsed;
 
-        if (Take(context.Settings.Macros, _wanted, _lastFired, now) is not { } row)
+        if (Take(context.Settings.Macros, _wanted, _lastFired, now, _options.FunctionKeyCooldown) is not { } row)
         {
             return;
         }
@@ -229,7 +228,11 @@ public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
     /// </para>
     /// </remarks>
     internal static int? Take(
-        FunctionKeyMacro[] macros, bool[] wanted, TimeSpan?[] lastFired, TimeSpan now)
+        FunctionKeyMacro[] macros,
+        bool[] wanted,
+        TimeSpan?[] lastFired,
+        TimeSpan now,
+        TimeSpan cooldown)
     {
         ArgumentNullException.ThrowIfNull(macros);
         ArgumentNullException.ThrowIfNull(wanted);
@@ -246,7 +249,8 @@ public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
 
             var macro = macros[row];
 
-            if (macro.Enabled && !string.IsNullOrWhiteSpace(macro.Command) && Ready(lastFired[row], now))
+            if (macro.Enabled && !string.IsNullOrWhiteSpace(macro.Command) &&
+                Ready(lastFired[row], now, cooldown))
             {
                 return row;
             }

@@ -39,6 +39,7 @@ public sealed class KeyboardHook : IDisposable
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private readonly HashSet<int> _keys;
+    private readonly Action? _notify;
     private readonly uint _processId;
     private readonly Thread _thread;
 
@@ -49,9 +50,10 @@ public sealed class KeyboardHook : IDisposable
     private uint _threadId;
     private nint _hook;
 
-    private KeyboardHook(IEnumerable<int> keys, uint processId)
+    private KeyboardHook(IEnumerable<int> keys, uint processId, Action? notify)
     {
         _keys = [.. keys];
+        _notify = notify;
         _processId = processId;
         _callback = OnKey;
         _thread = new Thread(Pump)
@@ -66,12 +68,13 @@ public sealed class KeyboardHook : IDisposable
     /// </summary>
     /// <param name="keys">Virtual key codes to watch for.</param>
     /// <param name="processId">Whose window has to be in front for a key to count.</param>
+    /// <param name="notify">A non-blocking callback used to wake the consumer.</param>
     /// <exception cref="GameProcessException">The hook could not be installed.</exception>
-    public static KeyboardHook Install(IEnumerable<int> keys, uint processId)
+    public static KeyboardHook Install(IEnumerable<int> keys, uint processId, Action? notify = null)
     {
         ArgumentNullException.ThrowIfNull(keys);
 
-        var hook = new KeyboardHook(keys, processId);
+        var hook = new KeyboardHook(keys, processId, notify);
 
         hook._thread.Start();
 
@@ -188,6 +191,7 @@ public sealed class KeyboardHook : IDisposable
             if (_keys.Contains(key) && InFront())
             {
                 _pressed.Enqueue(key);
+                _notify?.Invoke();
 
                 // Swallowed: the game must not also see it.
                 return 1;

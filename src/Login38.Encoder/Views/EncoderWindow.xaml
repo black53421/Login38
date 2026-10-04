@@ -322,6 +322,27 @@
                             <CheckBox Content="內建喝水輔助程式"
                                       Margin="{StaticResource RowSpacing}"
                                       IsChecked="{Binding Helper, Mode=TwoWay}" />
+
+                            <Grid Margin="{StaticResource RowSpacing}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           VerticalAlignment="Center"
+                                           Text="F1～F4 重複觸發間隔 (ms)" />
+                                <ui:NumberBox Grid.Column="1"
+                                              Minimum="100"
+                                              Maximum="5000"
+                                              MaxDecimalPlaces="0"
+                                              ClearButtonEnabled="False"
+                                              ValidationMode="InvalidInputOverwritten"
+                                              Value="{Binding FunctionKeyCooldown, Mode=TwoWay}" />
+                            </Grid>
+                            <TextBlock Style="{StaticResource Text.Caption}"
+                                       Text="預設 500 ms；Helper 執行週期為 100 ms，因此低於 100 ms 不會更快。"
+                                       TextWrapping="Wrap"
+                                       Margin="24,0,0,4" />
                             <CheckBox Content="撿取道具提示"
                                       Margin="{StaticResource RowSpacing}"
                                       IsChecked="{Binding PickupToast, Mode=TwoWay}" />

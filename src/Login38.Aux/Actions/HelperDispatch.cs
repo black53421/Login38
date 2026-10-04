@@ -127,9 +127,13 @@ public class HelperDispatch
         // "Use this on that" — a scroll on a weapon, a whetstone on what is being swung.
         // The server wants both, and using the scroll on its own only opens a target
         // cursor nobody is there to click.
-        if (entry.Cast.Kind is CastKind.HoverTarget or CastKind.OnSelfItem
-            or CastKind.OnInUseItem or CastKind.OnWieldedItem or CastKind.OnNamedItem
-            or CastKind.OnNamedEntity)
+        if (entry.Cast.Kind is CastKind.HoverTarget or CastKind.OnNamedEntity)
+        {
+            return UseOnEntity(process, entry, source);
+        }
+
+        if (entry.Cast.Kind is CastKind.OnSelfItem or CastKind.OnInUseItem
+            or CastKind.OnWieldedItem or CastKind.OnNamedItem)
         {
             return UseOnSomething(process, entry, bag, source);
         }
@@ -148,6 +152,32 @@ public class HelperDispatch
         return DispatchResult.Done;
     }
 
+    /// <summary>Sends an entity-targeted item packet once there is a live target.</summary>
+    private DispatchResult UseOnEntity(
+        RemoteProcess process, HelperEntry entry, InventoryItem source)
+    {
+        var target = EntityTargetOf(process, entry);
+
+        if (target is null)
+        {
+            return Skip(entry, "there is no world target to use it on");
+        }
+
+        _actions.UseOnEntity(
+            process, source.Param, target.Value.Id, target.Value.X, target.Value.Y);
+
+        return DispatchResult.Done;
+    }
+
+    /// <summary>What an entity-targeting item suffix says to aim at.</summary>
+    private Entity? EntityTargetOf(RemoteProcess process, HelperEntry entry) =>
+        entry.Cast.Kind switch
+        {
+            CastKind.HoverTarget => CurrentTarget(process),
+            CastKind.OnNamedEntity => Somebody(process, entry.Cast.Target),
+            _ => null,
+        };
+
     /// <summary>Sends "use this on that", once there is a that.</summary>
     private DispatchResult UseOnSomething(
         RemoteProcess process, HelperEntry entry, IReadOnlyList<InventoryItem> bag, InventoryItem source)
@@ -165,26 +195,21 @@ public class HelperDispatch
     }
 
     /// <summary>What an entry's suffix says to aim at.</summary>
-    private uint? TargetOf(RemoteProcess process, HelperEntry entry, IReadOnlyList<InventoryItem> bag) =>
+    private static uint? TargetOf(RemoteProcess process, HelperEntry entry, IReadOnlyList<InventoryItem> bag) =>
         entry.Cast.Kind switch
         {
-            CastKind.HoverTarget => CurrentTarget(process),
             CastKind.OnSelfItem => SelfId(process),
             CastKind.OnInUseItem => Worn(bag, entry.Cast.Target, i => i.IsInUse)?.Param,
             CastKind.OnWieldedItem => Worn(bag, entry.Cast.Target, i => i.IsWielded)?.Param,
             CastKind.OnNamedItem => Named(bag, entry.Cast.Target)?.Param,
-
-            // Somebody else, by name. Nothing in the client maps names to objects, so this
-            // is a walk of its heap — a second or so, and the only entry that costs one.
-            CastKind.OnNamedEntity => Somebody(process, entry.Cast.Target),
             _ => null,
         };
 
-    /// <summary>The id of the entity the client is currently fighting or pointing at.</summary>
-    private uint? CurrentTarget(RemoteProcess process) => _entities.Current(process)?.Id;
+    /// <summary>The entity the client is currently fighting or pointing at.</summary>
+    private Entity? CurrentTarget(RemoteProcess process) => _entities.Current(process);
 
-    /// <summary>The id of whoever is called this, if anyone in sight is.</summary>
-    private uint? Somebody(RemoteProcess process, string? name)
+    /// <summary>Whoever is called this, if anyone in sight is.</summary>
+    private Entity? Somebody(RemoteProcess process, string? name)
     {
         if (string.IsNullOrWhiteSpace(name))
         {
@@ -197,9 +222,10 @@ public class HelperDispatch
         }
 
         _logger.LogInformation(
-            "{Name} is at {Address}, id {Id:X8}", entity.Name, entity.Address, entity.Id);
+            "{Name} is at {Address}, id {Id:X8}, position {X},{Y}",
+            entity.Name, entity.Address, entity.Id, entity.X, entity.Y);
 
-        return entity.Id;
+        return entity;
     }
 
     /// <summary>
