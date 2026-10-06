@@ -69,6 +69,8 @@ public static class LauncherServices
         services.AddScoped<AuxRuntimeOptions>();
         services.AddScoped<AuxWakeSignal>();
         services.AddScoped<AuxHost>();
+        services.AddScoped<ActionArbiter>();
+        services.AddScoped<HotkeyFastWorker>();
 
         // Whether the player has started the helper on this game. Scoped, so a launcher
         // driving two clients has two of them and Home moves the one in front.
@@ -126,7 +128,10 @@ public static class LauncherServices
         services.AddScoped<IAuxTask, AnnouncementTask>();
         services.AddScoped<IAuxTask, ProfileTask>();
         services.AddScoped<IAuxTask, ToggleTask>();
-        services.AddScoped<IAuxTask, PotionTask>();
+        // PotionTask must stay ahead of HotkeyTask: one host pass has one player-action slot,
+        // and automatic recovery wins it when both become ready together.
+        services.AddScoped<PotionTask>();
+        services.AddScoped<IAuxTask>(services => services.GetRequiredService<PotionTask>());
         services.AddScoped<IAuxTask, EscapeTask>();
         services.AddScoped<IAuxTask, RelocateTask>();
         services.AddScoped<IAuxTask>(services => services.GetRequiredService<TimerTask>());

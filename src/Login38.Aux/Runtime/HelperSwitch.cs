@@ -1,4 +1,4 @@
-namespace Login38.Aux.Runtime;
+﻿namespace Login38.Aux.Runtime;
 
 /// <summary>
 /// Whether the player has started the helper for this game.
@@ -15,15 +15,17 @@ namespace Login38.Aux.Runtime;
 /// these, and Home belongs to whichever client is in front.
 /// </para>
 /// <para>
-/// Read from the helper's own loop and written from it, so nothing here needs guarding.
-/// The event, though, is raised on that loop and reaches a window: whoever subscribes owns
-/// getting it onto the thread its windows live on.
+/// Written from the helper loop and also read by the optional F-key worker. The on/off bit
+/// therefore uses volatile access; the event is still raised by the helper loop, and a
+/// window subscriber owns getting it onto the thread its windows live on.
 /// </para>
 /// </remarks>
 public sealed class HelperSwitch
 {
+    private int _isOn;
+
     /// <summary>Whether the helper's features are running.</summary>
-    public bool IsOn { get; private set; }
+    public bool IsOn => Volatile.Read(ref _isOn) != 0;
 
     /// <summary>Whether it has ever been on during this game.</summary>
     /// <remarks>
@@ -41,11 +43,12 @@ public sealed class HelperSwitch
     /// <returns>Where it now is.</returns>
     public bool Toggle()
     {
-        IsOn = !IsOn;
-        HasBeenOn |= IsOn;
+        var isOn = !IsOn;
+        Volatile.Write(ref _isOn, isOn ? 1 : 0);
+        HasBeenOn |= isOn;
 
-        Changed?.Invoke(this, IsOn);
+        Changed?.Invoke(this, isOn);
 
-        return IsOn;
+        return isOn;
     }
 }

@@ -26,23 +26,32 @@ public sealed class PotionTask : IAuxTask
 {
     private readonly GameActions _actions;
     private readonly Spells _spells;
+    private readonly ActionArbiter _arbiter;
     private readonly ILogger<PotionTask> _logger;
+    private readonly object _sync = new();
     private readonly Func<TimeSpan> _now;
     private readonly Func<RemoteProcess, uint?> _selfId;
 
     private TimeSpan _nextActionAt;
 
     public PotionTask(GameActions actions, Spells spells, ILogger<PotionTask> logger)
-        : this(actions, spells, logger, MonotonicNow(), ReadSelfId)
+        : this(actions, spells, logger, MonotonicNow(), ReadSelfId, new ActionArbiter())
+    {
+    }
+
+    public PotionTask(
+        GameActions actions, Spells spells, ActionArbiter arbiter, ILogger<PotionTask> logger)
+        : this(actions, spells, logger, MonotonicNow(), ReadSelfId, arbiter)
     {
     }
 
     internal PotionTask(
         GameActions actions, Spells spells, ILogger<PotionTask> logger, Func<TimeSpan> now,
-        Func<RemoteProcess, uint?>? selfId = null)
+        Func<RemoteProcess, uint?>? selfId = null, ActionArbiter? arbiter = null)
     {
         _actions = actions;
         _spells = spells;
+        _arbiter = arbiter ?? new ActionArbiter();
         _logger = logger;
         _now = now ?? throw new ArgumentNullException(nameof(now));
         _selfId = selfId ?? ReadSelfId;
@@ -51,8 +60,12 @@ public sealed class PotionTask : IAuxTask
     /// <inheritdoc/>
     public string Name => "potions";
 
-    /// <summary>Polls health and mana at the host cadence for fast threshold detection.</summary>
-    public TimeSpan Interval => TimeSpan.FromMilliseconds(100);
+    /// <summary>Checks on every host pass so a hotkey wake must yield to an urgent potion.</summary>
+    /// <remarks>
+    /// With no event wake the host itself still runs at its normal 100 ms cadence, so this
+    /// does not turn ordinary potion polling into a busy loop.
+    /// </remarks>
+    public TimeSpan Interval => TimeSpan.Zero;
 
     /// <summary>Minimum spacing between two potion-rule actions.</summary>
     internal static readonly TimeSpan ActionCooldown = TimeSpan.FromMilliseconds(500);
@@ -67,10 +80,24 @@ public sealed class PotionTask : IAuxTask
     }
 
     /// <inheritdoc/>
-    public void Tick(AuxContext context)
+    public void Tick(AuxContext context) => TryAct(context);
+
+    /// <summary>
+    /// Checks and, when needed, performs one recovery action. Safe to call from the fast
+    /// hotkey worker as well as the normal helper loop.
+    /// </summary>
+    internal bool TryAct(AuxContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
 
+        lock (_sync)
+        {
+            return TryActLocked(context);
+        }
+    }
+
+    private bool TryActLocked(AuxContext context)
+    {
         var settings = context.Settings;
         var rules = settings.Potions.Where(Wanted).ToList();
         var mana = settings.ManaWhenSafe;
@@ -78,12 +105,12 @@ public sealed class PotionTask : IAuxTask
 
         if (rules.Count == 0 && !wantsMana)
         {
-            return;
+            return false;
         }
 
         if (!context.IsInWorld)
         {
-            return;
+            return false;
         }
 
         var player = context.Player;
@@ -92,7 +119,7 @@ public sealed class PotionTask : IAuxTask
         {
             // A character who has just arrived, before the server has said how much health
             // they have. Acting on zero out of zero would drink everything they own.
-            return;
+            return false;
         }
 
         var now = Now;
@@ -102,7 +129,7 @@ public sealed class PotionTask : IAuxTask
         // state rather than on a decision queued half a second earlier.
         if (now < _nextActionAt)
         {
-            return;
+            return false;
         }
 
         foreach (var rule in rules)
@@ -112,17 +139,29 @@ public sealed class PotionTask : IAuxTask
                 continue;
             }
 
+            using var priority = _arbiter.WithPriority(PlayerActionPriority.Potion);
+
             if (Drink(context, rule.Item))
             {
+                context.PotionActionTaken = true;
                 _nextActionAt = now + ActionCooldown;
-                return;
+                return true;
             }
         }
 
-        if (wantsMana && Safe(settings, player) && Drink(context, mana.Item))
+        if (wantsMana && Safe(settings, player))
         {
-            _nextActionAt = now + ActionCooldown;
+            using var priority = _arbiter.WithPriority(PlayerActionPriority.Potion);
+
+            if (Drink(context, mana.Item))
+            {
+                context.PotionActionTaken = true;
+                _nextActionAt = now + ActionCooldown;
+                return true;
+            }
         }
+
+        return false;
     }
 
     private static bool Wanted(PotionRow row) => row.Enabled && !string.IsNullOrWhiteSpace(row.Item);

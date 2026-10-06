@@ -51,6 +51,7 @@ public class HelperDispatch
     private readonly EntityScan _entities;
     private readonly ILogger<HelperDispatch> _logger;
     private readonly HashSet<string> _said = [];
+    private readonly object _saidSync = new();
 
     public HelperDispatch(
         GameActions actions, Spells spells, EntityScan entities, ILogger<HelperDispatch> logger)
@@ -324,7 +325,14 @@ public class HelperDispatch
     /// </remarks>
     private DispatchResult Skip(HelperEntry entry, string why)
     {
-        if (_said.Add(entry.Name + "\u0000" + why))
+        var first = false;
+
+        lock (_saidSync)
+        {
+            first = _said.Add(entry.Name + "\u0000" + why);
+        }
+
+        if (first)
         {
             _logger.LogInformation("{Name}: {Why}", entry.Name, why);
         }
@@ -333,6 +341,11 @@ public class HelperDispatch
     }
 
     /// <summary>Forgets what was said about an entry, so the next problem is reported.</summary>
-    private void Worked(HelperEntry entry) =>
-        _said.RemoveWhere(said => said.StartsWith(entry.Name + "\u0000", StringComparison.Ordinal));
+    private void Worked(HelperEntry entry)
+    {
+        lock (_saidSync)
+        {
+            _said.RemoveWhere(said => said.StartsWith(entry.Name + "\u0000", StringComparison.Ordinal));
+        }
+    }
 }

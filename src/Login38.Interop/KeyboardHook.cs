@@ -1,9 +1,14 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
 using Login38.Interop.Win32;
 
 namespace Login38.Interop;
+
+/// <summary>One watched keyboard edge.</summary>
+/// <param name="Key">Virtual-key code.</param>
+/// <param name="IsDown">True for key-down, false for key-up.</param>
+public readonly record struct KeyboardHookEvent(int Key, bool IsDown);
 
 /// <summary>
 /// Watches for a few keys being pressed while a particular process is in front.
@@ -34,7 +39,7 @@ public sealed class KeyboardHook : IDisposable
     /// <summary>And to wait for it to leave once asked.</summary>
     private static readonly TimeSpan StopTimeout = TimeSpan.FromSeconds(2);
 
-    private readonly ConcurrentQueue<int> _pressed = new();
+    private readonly ConcurrentQueue<KeyboardHookEvent> _events = new();
     private readonly TaskCompletionSource<Exception?> _ready =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -95,11 +100,32 @@ public sealed class KeyboardHook : IDisposable
         return hook;
     }
 
-    /// <summary>Takes the next key pressed since the last call, if there was one.</summary>
-    public bool TryTake(out int key) => _pressed.TryDequeue(out key);
+    /// <summary>Takes the next keyboard edge since the last call, if there was one.</summary>
+    public bool TryTakeEvent(out KeyboardHookEvent keyEvent) => _events.TryDequeue(out keyEvent);
 
-    /// <summary>How many presses are waiting.</summary>
-    public int Waiting => _pressed.Count;
+    /// <summary>
+    /// Takes the next key-down, for the legacy polling path. Key-up edges are consumed.
+    /// </summary>
+    public bool TryTake(out int key)
+    {
+        while (_events.TryDequeue(out var keyEvent))
+        {
+            if (keyEvent.IsDown)
+            {
+                key = keyEvent.Key;
+                return true;
+            }
+        }
+
+        key = 0;
+        return false;
+    }
+
+    /// <summary>How many keyboard edges are waiting.</summary>
+    public int Waiting => _events.Count;
+
+    /// <summary>Whether the watched game process currently owns the foreground window.</summary>
+    public bool WatchedProcessIsInFront => InFront();
 
     /// <summary>
     /// Removes the hook and waits for its thread.
@@ -183,18 +209,26 @@ public sealed class KeyboardHook : IDisposable
     /// </remarks>
     private nint OnKey(int code, nint wparam, nint lparam)
     {
-        if (code >= 0 && ((uint)wparam is User32.WmKeyDown or User32.WmSysKeyDown))
+        if (code >= 0)
         {
-            var data = Marshal.PtrToStructure<KeyboardHookData>(lparam);
-            var key = (int)data.VirtualKey;
+            var message = (uint)wparam;
+            var isDown = message is User32.WmKeyDown or User32.WmSysKeyDown;
+            var isUp = message is User32.WmKeyUp or User32.WmSysKeyUp;
 
-            if (_keys.Contains(key) && InFront())
+            if (isDown || isUp)
             {
-                _pressed.Enqueue(key);
-                _notify?.Invoke();
+                var data = Marshal.PtrToStructure<KeyboardHookData>(lparam);
+                var key = (int)data.VirtualKey;
 
-                // Swallowed: the game must not also see it.
-                return 1;
+                if (_keys.Contains(key) && InFront())
+                {
+                    _events.Enqueue(new KeyboardHookEvent(key, isDown));
+                    _notify?.Invoke();
+
+                    // Swallow both edges: letting key-up through after taking key-down lets
+                    // the client's own F-key state machine see half of a press.
+                    return 1;
+                }
             }
         }
 

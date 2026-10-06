@@ -99,6 +99,7 @@ public sealed class ListFileCodecTests
                 InventoryLimitValue = 500,
                 ImgLimitValue = 123_456,
                 FunctionKeyCooldownMs = 750,
+                FunctionKeyHighSpeedEnabled = true,
                 DynamicIconPakName = "999",
                 TransformFileName = "halloween",
                 TextEncoding = TextEncodingMode.Gbk,
@@ -167,6 +168,16 @@ public sealed class ListFileCodecTests
     public void OlderConfigGetsDefaultFunctionKeyCooldown() =>
         ListFileCodec.Parse("[aux]\npacket_encrypt=true\n")
             .Aux.FunctionKeyCooldownMs.ShouldBe(AuxConfig.FunctionKeyCooldownBounds.Default);
+
+    [Fact]
+    public void ParsesFunctionKeyHighSpeedSwitch() =>
+        ListFileCodec.Parse("[aux]\nfunction_key_high_speed_enabled=true\n")
+            .Aux.FunctionKeyHighSpeedEnabled.ShouldBeTrue();
+
+    [Fact]
+    public void OlderConfigKeepsFunctionKeyHighSpeedOff() =>
+        ListFileCodec.Parse("[aux]\npacket_encrypt=true\n")
+            .Aux.FunctionKeyHighSpeedEnabled.ShouldBeFalse();
 
     [Fact]
     public void ParsesStartupPacketSpySwitch() =>

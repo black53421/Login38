@@ -8,6 +8,8 @@ public sealed class AuxRuntimeOptions
     public TimeSpan FunctionKeyCooldown { get; private set; } =
         TimeSpan.FromMilliseconds(AuxConfig.FunctionKeyCooldownBounds.Default);
 
+    public bool FunctionKeyHighSpeedEnabled { get; private set; }
+
     public void Load(AuxConfig aux)
     {
         ArgumentNullException.ThrowIfNull(aux);
@@ -18,5 +20,6 @@ public sealed class AuxRuntimeOptions
             AuxConfig.FunctionKeyCooldownBounds.Max);
 
         FunctionKeyCooldown = TimeSpan.FromMilliseconds(milliseconds);
+        FunctionKeyHighSpeedEnabled = aux.FunctionKeyHighSpeedEnabled;
     }
 }

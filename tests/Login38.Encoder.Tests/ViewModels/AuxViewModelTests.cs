@@ -47,6 +47,7 @@ public sealed class AuxViewModelTests
             MultiInstance = true,
             MultiInstanceLimit = 4,
             FunctionKeyCooldownMs = 750,
+            FunctionKeyHighSpeedEnabled = true,
             TextEncoding = TextEncodingMode.Gbk,
         };
 
@@ -81,6 +82,7 @@ public sealed class AuxViewModelTests
         back.MultiInstance.ShouldBeTrue();
         back.MultiInstanceLimit.ShouldBe(4u);
         back.FunctionKeyCooldownMs.ShouldBe(750u);
+        back.FunctionKeyHighSpeedEnabled.ShouldBeTrue();
         back.TextEncoding.ShouldBe(TextEncodingMode.Gbk);
     }
 

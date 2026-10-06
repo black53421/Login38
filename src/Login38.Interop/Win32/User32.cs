@@ -76,7 +76,11 @@ internal static partial class User32
 
     internal const uint WmKeyDown = 0x0100;
 
+    internal const uint WmKeyUp = 0x0101;
+
     internal const uint WmSysKeyDown = 0x0104;
+
+    internal const uint WmSysKeyUp = 0x0105;
 
     internal const uint WmQuit = 0x0012;
 

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using Login38.Aux.Actions;
 using Login38.Aux.Settings;
 using Login38.Interop;
@@ -16,13 +16,12 @@ namespace Login38.Aux.Runtime;
 /// clock or by a number going down.
 /// </para>
 /// <para>
-/// Two threads are involved and the split matters. The keyboard hook runs on an operating
-/// system input thread with a deadline it must not miss, so all it does is note which key
-/// it was. The command itself — reading the bag, sending a packet — happens here, on the
-/// helper's own loop, a fraction of a second later.
+/// The keyboard hook always does the minimum: record an edge and return. In normal mode the
+/// helper loop consumes those presses; in high-speed mode a dedicated worker consumes them
+/// and owns held-key repeat timing. Neither path runs game code inside the hook callback.
 /// </para>
 /// </remarks>
-public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
+public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown, IAuxTaskSwitchOff
 {
     /// <summary>F1 through F4.</summary>
     internal static readonly int[] Keys = [0x70, 0x71, 0x72, 0x73];
@@ -30,6 +29,7 @@ public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
     private readonly HelperDispatch _dispatch;
     private readonly AuxRuntimeOptions _options;
     private readonly AuxWakeSignal _wake;
+    private readonly HotkeyFastWorker _fastWorker;
     private readonly ILogger<HotkeyTask> _logger;
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly TimeSpan?[] _lastFired = new TimeSpan?[AuxSettings.FunctionKeyMacros];
@@ -37,16 +37,19 @@ public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
 
     private KeyboardHook? _hook;
     private bool _tried;
+    private bool _fastTried;
 
     public HotkeyTask(
         HelperDispatch dispatch,
         AuxRuntimeOptions options,
         AuxWakeSignal wake,
+        HotkeyFastWorker fastWorker,
         ILogger<HotkeyTask> logger)
     {
         _dispatch = dispatch;
         _options = options;
         _wake = wake;
+        _fastWorker = fastWorker;
         _logger = logger;
     }
 
@@ -74,6 +77,16 @@ public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
             return;
         }
 
+        if (_options.FunctionKeyHighSpeedEnabled)
+        {
+            StopLegacyListening();
+            StartFastWorker(context.Process);
+            return;
+        }
+
+        _fastWorker.Stop();
+        _fastTried = false;
+
         if (!Listening(context))
         {
             return;
@@ -90,6 +103,14 @@ public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
             return;
         }
 
+        // PotionTask runs earlier in the same host pass. If it actually used an item or
+        // skill, keep the key wanted and let the next pass handle it. This gives emergency
+        // recovery the action slot without making the player's key press disappear.
+        if (context.PotionActionTaken)
+        {
+            return;
+        }
+
         Fire(context);
     }
 
@@ -99,6 +120,13 @@ public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
     /// after the game has gone, which is a good deal worse than the feature not working.
     /// </remarks>
     public void Stopping() => StopListening();
+
+    /// <inheritdoc/>
+    public void SwitchedOff(RemoteProcess process)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+        StopListening();
+    }
 
 
     /// <summary>Whether at least one function-key macro can actually run.</summary>
@@ -112,10 +140,37 @@ public sealed class HotkeyTask : IAuxTask, IAuxTaskShutdown
 
     private void StopListening()
     {
+        StopLegacyListening();
+        _fastWorker.Stop();
+        _fastTried = false;
+        Array.Clear(_wanted);
+    }
+
+    private void StopLegacyListening()
+    {
         _hook?.Dispose();
         _hook = null;
         _tried = false;
         Array.Clear(_wanted);
+    }
+
+    private void StartFastWorker(RemoteProcess process)
+    {
+        if (_fastWorker.IsRunning || _fastTried)
+        {
+            return;
+        }
+
+        _fastTried = true;
+
+        try
+        {
+            _fastWorker.Start(process);
+        }
+        catch (GameProcessException e)
+        {
+            _logger.LogWarning(e, "The F1-F4 high-speed worker could not start; the macros are off");
+        }
     }
 
     /// <summary>Which macro a virtual key belongs to.</summary>

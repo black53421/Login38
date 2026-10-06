@@ -1,3 +1,18 @@
+# 2026-10-05 - optional low-latency F1-F4 worker
+
+- Add Encoder switch `function_key_high_speed_enabled` for a dedicated F1-F4 worker.
+- High-speed mode consumes key-down/key-up edges, ignores Windows auto-repeat, and uses monotonic repeat deadlines with the existing `function_key_cooldown_ms`.
+- The worker runs at `AboveNormal` priority and wakes from keyboard events instead of waiting for the 100 ms AuxHost cadence.
+- Add a shared action arbiter: waiting potion actions take priority over F1-F4, which take priority over ordinary helper actions; client `RemoteCall` entry points remain serialized.
+- Before every fast hotkey action, re-check potion rules on a fresh player/bag snapshot. If recovery acts, defer the hotkey for one normal AuxHost cadence rather than dropping it.
+- Make shared spell/dispatch state safe for the additional reader thread.
+
+# 2026-10-04 - potion priority over F1-F4
+
+- Automatic potion rules now run on every AuxHost pass, including passes woken early by F1-F4.
+- When a potion rule actually sends an action, F1-F4 yield for that pass and keep the pending key press for the next pass.
+- Potion cooldown behavior is unchanged; a potion that is still cooling down does not block F1-F4.
+
 ## 2026-10-01
 
 ### F1-F4 input latency

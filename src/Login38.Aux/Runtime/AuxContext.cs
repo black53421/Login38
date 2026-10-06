@@ -50,6 +50,13 @@ public class AuxContext
     /// <summary>What the player has asked for. Fixed for the length of this pass.</summary>
     public AuxSettings Settings { get; }
 
+    /// <summary>Whether a potion rule already used this pass's player-action slot.</summary>
+    /// <remarks>
+    /// A context lives for one host pass, so this clears naturally on the next pass. Hotkeys
+    /// use it to yield without losing the key press that woke the host.
+    /// </remarks>
+    internal bool PotionActionTaken { get; set; }
+
     /// <summary>The player, read once and shared.</summary>
     public virtual PlayerState Player => _player ??= PlayerStateReader.Read(Process);
 

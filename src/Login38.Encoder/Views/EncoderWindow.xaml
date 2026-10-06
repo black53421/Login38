@@ -339,8 +339,11 @@
                                               ValidationMode="InvalidInputOverwritten"
                                               Value="{Binding FunctionKeyCooldown, Mode=TwoWay}" />
                             </Grid>
+                            <CheckBox Content="F1～F4 高速模式（較高資源）"
+                                      Margin="{StaticResource RowSpacing}"
+                                      IsChecked="{Binding FunctionKeyHighSpeed, Mode=TwoWay}" />
                             <TextBlock Style="{StaticResource Text.Caption}"
-                                       Text="預設 500 ms；Helper 執行週期為 100 ms，因此低於 100 ms 不會更快。"
+                                       Text="高速模式使用專用執行緒即時處理按鍵；關閉時仍由 Helper 100 ms 排程處理。重複施放間隔仍使用上方設定。"
                                        TextWrapping="Wrap"
                                        Margin="24,0,0,4" />
                             <CheckBox Content="撿取道具提示"

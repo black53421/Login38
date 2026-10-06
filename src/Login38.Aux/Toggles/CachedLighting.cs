@@ -1,3 +1,4 @@
+﻿using Login38.Aux.Actions;
 using Login38.Interop;
 using Microsoft.Extensions.Logging;
 
@@ -28,8 +29,17 @@ namespace Login38.Aux.Toggles;
 internal class CachedLighting
 {
     private readonly ILogger _logger;
+    private readonly ActionArbiter _arbiter;
 
-    public CachedLighting(ILogger logger) => _logger = logger;
+    public CachedLighting(ILogger logger) : this(logger, new ActionArbiter())
+    {
+    }
+
+    public CachedLighting(ILogger logger, ActionArbiter arbiter)
+    {
+        _logger = logger;
+        _arbiter = arbiter;
+    }
 
     /// <summary>
     /// Makes the world bright now rather than at the next map change.
@@ -82,7 +92,7 @@ internal class CachedLighting
     {
         try
         {
-            RemoteCall.Run(process, PaletteRefresh.Code, AllDayToggle.RefreshTimeout);
+            _arbiter.Run(() => { _ = RemoteCall.Run(process, PaletteRefresh.Code, AllDayToggle.RefreshTimeout); });
         }
         catch (GameProcessException e)
         {

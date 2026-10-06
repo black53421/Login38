@@ -268,7 +268,29 @@ public sealed class PotionTaskTests : IDisposable
     }
 
     [Fact]
-    public void PollsTenTimesASecond() => Task().Interval.ShouldBe(TimeSpan.FromMilliseconds(100));
+    public void RunsOnEveryHostPassSoHotkeyWakeCanYieldToIt() => Task().Interval.ShouldBe(TimeSpan.Zero);
+
+    [Fact]
+    public void MarksThePassWhenItActuallyUsesAPotion()
+    {
+        var context = new StubContext(
+            _process, Settings(Rule(Red, 50)), Player(hp: 10, max: 100), Bag(Red), true);
+
+        Task().Tick(context);
+
+        context.PotionActionTaken.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void DoesNotClaimThePassWhenNoPotionActionWasTaken()
+    {
+        var context = new StubContext(
+            _process, Settings(Rule(Red, 50)), Player(hp: 90, max: 100), Bag(Red), true);
+
+        Task().Tick(context);
+
+        context.PotionActionTaken.ShouldBeFalse();
+    }
 
     [Fact]
     public void KeepsPotionActionsHalfASecondApart()

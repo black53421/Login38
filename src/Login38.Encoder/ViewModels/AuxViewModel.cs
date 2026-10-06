@@ -174,6 +174,9 @@ public sealed partial class AuxViewModel : ObservableObject
     private double _functionKeyCooldown = AuxConfig.FunctionKeyCooldownBounds.Default;
 
     [ObservableProperty]
+    private bool _functionKeyHighSpeed;
+
+    [ObservableProperty]
     private TextEncodingMode _encoding = TextEncodingMode.Big5;
 
     partial void OnRangeSkillDamageExtensionChanged(bool value)
@@ -223,6 +226,7 @@ public sealed partial class AuxViewModel : ObservableObject
         MultipleCopies = aux.MultiInstance;
         CopyLimit = aux.MultiInstanceLimit;
         FunctionKeyCooldown = aux.FunctionKeyCooldownMs;
+        FunctionKeyHighSpeed = aux.FunctionKeyHighSpeedEnabled;
         Encoding = aux.TextEncoding;
     }
 
@@ -262,6 +266,7 @@ public sealed partial class AuxViewModel : ObservableObject
             CopyLimit, AuxConfig.MultiInstanceLimitBounds.Min, AuxConfig.MultiInstanceLimitBounds.Max),
         FunctionKeyCooldownMs = Bounded(
             FunctionKeyCooldown, AuxConfig.FunctionKeyCooldownBounds.Min, AuxConfig.FunctionKeyCooldownBounds.Max),
+        FunctionKeyHighSpeedEnabled = FunctionKeyHighSpeed,
         TextEncoding = Encoding,
     }.Normalized();
 

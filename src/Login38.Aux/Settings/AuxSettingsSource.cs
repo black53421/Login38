@@ -1,13 +1,13 @@
-namespace Login38.Aux.Settings;
+﻿namespace Login38.Aux.Settings;
 
 /// <summary>
 /// The settings the helper loop reads and the window writes.
 /// </summary>
 /// <remarks>
 /// <para>
-/// One reader running ten times a second and one writer that moves a switch now and then.
-/// The window edits its own copy and publishes it; the loop picks the new one up on its
-/// next pass. There is nothing to restart and nothing to re-attach, which is the whole
+/// Readers are the normal helper loop and, when enabled, the dedicated F-key worker; the
+/// writer is the helper window. The window edits its own copy and publishes it atomically,
+/// so either reader sees the old complete settings or the new complete settings. There is nothing to restart and nothing to re-attach, which is the whole
 /// point — a player changes a threshold and the next tick uses it.
 /// </para>
 /// <para>

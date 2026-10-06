@@ -109,6 +109,7 @@ public static class ListFileCodec
         AppendUInt(output, "inventory_limit_value", aux.InventoryLimitValue);
         AppendUInt(output, "img_limit_value", aux.ImgLimitValue);
         AppendUInt(output, "function_key_cooldown_ms", aux.FunctionKeyCooldownMs);
+        AppendBool(output, "function_key_high_speed_enabled", aux.FunctionKeyHighSpeedEnabled);
         AppendText(output, "text_encoding", aux.TextEncoding.ToConfigValue());
         AppendBool(output, "dynamic_dialog_enabled", aux.DynamicDialogEnabled);
         AppendBool(output, "pickup_toast_enabled", aux.PickupToastEnabled);
@@ -187,6 +188,7 @@ public static class ListFileCodec
             case "range_skill_damage_extension": aux.RangeSkillDamageExtension = BooleanText.IsTruthy(value); break;
             case "packet_spy_startup_enabled": aux.PacketSpyStartupEnabled = BooleanText.IsTruthy(value); break;
             case "internal_bot_enabled": aux.InternalBotEnabled = BooleanText.IsTruthy(value); break;
+            case "function_key_high_speed_enabled": aux.FunctionKeyHighSpeedEnabled = BooleanText.IsTruthy(value); break;
 
             case "multi_instance_limit":
                 aux.MultiInstanceLimit = ParseClamped(

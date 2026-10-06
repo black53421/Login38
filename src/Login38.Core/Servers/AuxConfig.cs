@@ -128,6 +128,9 @@ public sealed class AuxConfig
     /// <summary>Minimum interval between repeated F1-F4 macro executions, in milliseconds.</summary>
     public uint FunctionKeyCooldownMs { get; set; } = FunctionKeyCooldownBounds.Default;
 
+    /// <summary>Use a dedicated low-latency worker for F1-F4 instead of the helper cadence.</summary>
+    public bool FunctionKeyHighSpeedEnabled { get; set; }
+
     /// <summary>Base name of the custom icon pak, e.g. <c>"123"</c> for <c>123.pak</c>/<c>123.idx</c>.</summary>
     public string DynamicIconPakName { get; set; } = "123";
 

@@ -1,4 +1,4 @@
-using Login38.Core.Text;
+﻿using Login38.Core.Text;
 using Login38.Interop;
 using Microsoft.Extensions.Logging;
 
@@ -68,6 +68,7 @@ public class GameChat
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(5);
 
     private readonly ILegacyTextCodec _codec;
+    private readonly ActionArbiter _arbiter;
     private readonly ILogger<GameChat> _logger;
 
     private GameAddress? _page;
@@ -75,8 +76,14 @@ public class GameChat
     private int _next;
 
     public GameChat(ILegacyTextCodec codec, ILogger<GameChat> logger)
+        : this(codec, new ActionArbiter(), logger)
+    {
+    }
+
+    public GameChat(ILegacyTextCodec codec, ActionArbiter arbiter, ILogger<GameChat> logger)
     {
         _codec = codec;
+        _arbiter = arbiter;
         _logger = logger;
     }
 
@@ -101,7 +108,7 @@ public class GameChat
 
             process.WriteBytes(slot, text);
 
-            RemoteCall.Run(process, Build(slot), Timeout);
+            _arbiter.Run(() => { _ = RemoteCall.Run(process, Build(slot), Timeout); });
         }
         catch (GameProcessException e)
         {

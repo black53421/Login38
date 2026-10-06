@@ -18,4 +18,14 @@ public sealed class AuxRuntimeOptionsTests
 
         options.FunctionKeyCooldown.ShouldBe(TimeSpan.FromMilliseconds(expected));
     }
+    [Fact]
+    public void CarriesTheFunctionKeyHighSpeedSwitch()
+    {
+        var options = new AuxRuntimeOptions();
+
+        options.Load(new AuxConfig { FunctionKeyHighSpeedEnabled = true });
+
+        options.FunctionKeyHighSpeedEnabled.ShouldBeTrue();
+    }
+
 }

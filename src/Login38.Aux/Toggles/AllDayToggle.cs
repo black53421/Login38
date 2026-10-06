@@ -1,4 +1,5 @@
 using Login38.Aux.Game;
+using Login38.Aux.Actions;
 using Login38.Aux.Settings;
 using Login38.Interop;
 using Microsoft.Extensions.Logging;
@@ -129,6 +130,11 @@ public sealed class AllDayToggle : IGameToggle
     private bool _reported;
 
     public AllDayToggle(ILogger<AllDayToggle> logger) : this(logger, Sites, new CachedLighting(logger))
+    {
+    }
+
+    public AllDayToggle(ILogger<AllDayToggle> logger, ActionArbiter arbiter)
+        : this(logger, Sites, new CachedLighting(logger, arbiter))
     {
     }
 

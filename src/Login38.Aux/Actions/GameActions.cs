@@ -43,13 +43,21 @@ public class GameActions
     private const int WatchedLength = 16;
 
     private readonly ILegacyTextCodec _codec;
+    private readonly ActionArbiter _arbiter;
     private readonly ILogger<GameActions> _logger;
+    private readonly object _watchSync = new();
 
     private byte[]? _watched;
 
     public GameActions(ILegacyTextCodec codec, ILogger<GameActions> logger)
+        : this(codec, new ActionArbiter(), logger)
+    {
+    }
+
+    public GameActions(ILegacyTextCodec codec, ActionArbiter arbiter, ILogger<GameActions> logger)
     {
         _codec = codec;
+        _arbiter = arbiter;
         _logger = logger;
     }
 
@@ -63,7 +71,10 @@ public class GameActions
     {
         ArgumentNullException.ThrowIfNull(process);
 
-        WatchTheFunction(process);
+        lock (_watchSync)
+        {
+            WatchTheFunction(process);
+        }
 
         Run(process, Calls.OneArgument(GameFunctions.UseItem, entry.Value), nameof(UseItem));
     }
@@ -233,7 +244,9 @@ public class GameActions
     {
         ArgumentNullException.ThrowIfNull(process);
 
-        var exit = RemoteCall.Run(process, code, Timeout);
+        uint exit = 0;
+
+        _arbiter.Run(() => exit = RemoteCall.Run(process, code, Timeout));
 
         _logger.LogDebug("{Action} returned {Exit:X8}", what, exit);
     }

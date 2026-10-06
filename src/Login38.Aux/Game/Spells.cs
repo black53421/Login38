@@ -90,6 +90,7 @@ public class Spells
 
     private readonly ILegacyTextCodec _codec;
     private readonly ILogger _logger;
+    private readonly object _sync = new();
 
     private Dictionary<string, Spell> _book = [];
     private uint _bookPointer;
@@ -102,7 +103,16 @@ public class Spells
     }
 
     /// <summary>How many skills the character has learned, as last read.</summary>
-    public int Learned => _book.Count;
+    public int Learned
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return _book.Count;
+            }
+        }
+    }
 
     /// <summary>
     /// Where a skill's own record is, if it is still that skill's record.
@@ -146,14 +156,17 @@ public class Spells
         ArgumentNullException.ThrowIfNull(process);
         ArgumentException.ThrowIfNullOrEmpty(name);
 
-        Refresh(process);
-
-        if (_book.TryGetValue(name, out var learned))
+        lock (_sync)
         {
-            return learned.Packed;
-        }
+            Refresh(process);
 
-        return _catalogue is not null && _catalogue.TryGetValue(name, out var known) ? known : null;
+            if (_book.TryGetValue(name, out var learned))
+            {
+                return learned.Packed;
+            }
+
+            return _catalogue is not null && _catalogue.TryGetValue(name, out var known) ? known : null;
+        }
     }
 
     /// <summary>What the character has learned about a skill, if they have.</summary>
@@ -162,9 +175,11 @@ public class Spells
         ArgumentNullException.ThrowIfNull(process);
         ArgumentException.ThrowIfNullOrEmpty(name);
 
-        Refresh(process);
-
-        return _book.TryGetValue(name, out var spell) ? spell : null;
+        lock (_sync)
+        {
+            Refresh(process);
+            return _book.TryGetValue(name, out var spell) ? spell : null;
+        }
     }
 
     /// <summary>Every skill the character has learned that acts on a target.</summary>
@@ -172,8 +187,16 @@ public class Spells
     /// As last read. <see cref="Attacks"/> is the one to ask when the answer has to be
     /// current, which from anywhere holding a process it is.
     /// </remarks>
-    public IEnumerable<string> AttackNames =>
-        _book.Where(pair => pair.Value.IsAttack).Select(pair => pair.Key);
+    public IEnumerable<string> AttackNames
+    {
+        get
+        {
+            lock (_sync)
+            {
+                return [.. _book.Where(pair => pair.Value.IsAttack).Select(pair => pair.Key)];
+            }
+        }
+    }
 
     /// <summary>
     /// The same, after making sure the book belongs to the character in front of us.
@@ -187,9 +210,11 @@ public class Spells
     {
         ArgumentNullException.ThrowIfNull(process);
 
-        Refresh(process);
-
-        return [.. AttackNames];
+        lock (_sync)
+        {
+            Refresh(process);
+            return [.. _book.Where(pair => pair.Value.IsAttack).Select(pair => pair.Key)];
+        }
     }
 
     /// <summary>Names close to one that was not found, for a player who has mistyped.</summary>
@@ -197,10 +222,13 @@ public class Spells
     {
         ArgumentException.ThrowIfNullOrEmpty(name);
 
-        return _book.Keys.Concat(_catalogue?.Keys ?? Enumerable.Empty<string>())
-            .Where(known => known.StartsWith(name[0]) || known.Contains(name, StringComparison.Ordinal))
-            .Distinct()
-            .Take(8);
+        lock (_sync)
+        {
+            return [.. _book.Keys.Concat(_catalogue?.Keys ?? Enumerable.Empty<string>())
+                .Where(known => known.StartsWith(name[0]) || known.Contains(name, StringComparison.Ordinal))
+                .Distinct()
+                .Take(8)];
+        }
     }
 
     /// <summary>
