@@ -51,6 +51,10 @@ public sealed partial class MiscViewModel : ObservableObject
     [ObservableProperty]
     private bool _logReceivedPackets;
 
+    /// <summary>Trace selected elf attack/earth buff packets and client apply_buff calls.</summary>
+    [ObservableProperty]
+    private bool _elfBuffStateDiagnostics;
+
     /// <summary>Name what goes into the bag, in the corner of the screen.</summary>
     [ObservableProperty]
     private bool _pickupToast;
@@ -73,6 +77,7 @@ public sealed partial class MiscViewModel : ObservableObject
         DamageAtFeet = misc.DamageAtFeet;
         LogSentPackets = misc.LogSentPackets;
         LogReceivedPackets = misc.LogReceivedPackets;
+        ElfBuffStateDiagnostics = misc.ElfBuffStateDiagnostics;
         PickupToast = misc.PickupToast;
         GainDrift = misc.GainDrift;
     }
@@ -89,6 +94,7 @@ public sealed partial class MiscViewModel : ObservableObject
         DamageAtFeet = DamageAtFeet,
         LogSentPackets = LogSentPackets,
         LogReceivedPackets = LogReceivedPackets,
+        ElfBuffStateDiagnostics = ElfBuffStateDiagnostics,
         PickupToast = PickupToast,
         GainDrift = GainDrift,
     };

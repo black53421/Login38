@@ -113,6 +113,7 @@ public sealed class AuxSettingsJsonTests
         settings.Misc.MonsterLevelColour.ShouldBeTrue();
         settings.Misc.ShowAttackDamage.ShouldBeTrue();
         settings.Misc.ShowClock.ShouldBeFalse();
+        settings.Misc.ElfBuffStateDiagnostics.ShouldBeFalse();
 
         settings.TimersEnabled.ShouldBeTrue();
         settings.TimerRows[0].IntervalSeconds.ShouldBe(300u);
@@ -179,6 +180,7 @@ public sealed class AuxSettingsJsonTests
     [InlineData("\"interval_sec\"")]
     [InlineData("\"monster_level_color\"")]
     [InlineData("\"damage_at_feet\"")]
+    [InlineData("\"elf_buff_state_diagnostics\"")]
     public void KeepsTheNamesTheFileAlreadyUses(string name) =>
         JsonSerializer.Serialize(Read(), AuxSettingsJson.Options).ShouldContain(name);
 

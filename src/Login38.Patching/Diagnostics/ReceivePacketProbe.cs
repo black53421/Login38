@@ -33,6 +33,12 @@ public static class ReceivePacketProbe
 
     internal static void Register(uint processId, GameAddress data) => Blocks[processId] = data;
 
+    internal static bool TryGetBlock(RemoteProcess process, out GameAddress data)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+        return Blocks.TryGetValue(process.Id, out data);
+    }
+
     /// <summary>Turns receive recording on or off for this game process.</summary>
     public static bool TrySetEnabled(RemoteProcess process, bool enabled)
     {

@@ -119,6 +119,16 @@ public sealed class MiscToggles
     [JsonPropertyName("log_received_packets")]
     public bool LogReceivedPackets { get; set; }
 
+    /// <summary>
+    /// Trace the selected elf attack/earth buff packets and their client apply_buff state changes.
+    /// </summary>
+    /// <remarks>
+    /// Diagnostic only. It shares the receive recorder with full packet logging and adds a
+    /// pass-through apply_buff call tracer for states 6, 7, 8 and 18 through 23.
+    /// </remarks>
+    [JsonPropertyName("elf_buff_state_diagnostics")]
+    public bool ElfBuffStateDiagnostics { get; set; }
+
     /// <summary>Name what goes into the bag, in the bottom-left corner.</summary>
     [JsonPropertyName("pickup_toast")]
     public bool PickupToast { get; set; }

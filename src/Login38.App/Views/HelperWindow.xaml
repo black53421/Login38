@@ -1063,7 +1063,7 @@
                         </lui:Section>
 
                         <lui:Section Header="診斷"
-                                     Note="用來分析客戶端與伺服器封包。每個封包都會寫入 log，不適合長時間開著。">
+                                     Note="完整封包記錄會大量寫入 log；妖精 Buff 診斷會追蹤火系/土系封包與 Client apply_buff 呼叫，不修改 Buff 效果。">
                             <StackPanel>
                                 <CheckBox Content="記錄客戶端送出的所有封包"
                                           Margin="{StaticResource RowSpacing}"
@@ -1071,6 +1071,10 @@
 
                                 <CheckBox Content="記錄伺服器送入客戶端的所有封包"
                                           IsChecked="{Binding LogReceivedPackets, Mode=TwoWay}" />
+
+                                <CheckBox Content="診斷妖精 Buff 互斥（火系 / 土系）"
+                                          Margin="0,8,0,0"
+                                          IsChecked="{Binding ElfBuffStateDiagnostics, Mode=TwoWay}" />
                             </StackPanel>
                         </lui:Section>
                     </StackPanel>

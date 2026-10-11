@@ -143,6 +143,17 @@ public sealed class BuffState
     public bool At(int index) =>
         index >= 0 && index < Half && (_bytes[index] != 0 || _bytes[Half + index] != 0);
 
+    /// <summary>Reads both raw bytes for one client effect index.</summary>
+    internal (byte Primary, byte Secondary) RawAt(int index)
+    {
+        if (index < 0 || index >= Half)
+        {
+            return (0, 0);
+        }
+
+        return (_bytes[index], _bytes[Half + index]);
+    }
+
     /// <summary>Turns the number in a player's settings into this character's table index.</summary>
     internal static int Remap(byte characterClass, int stateId) =>
         ByClass.TryGetValue((characterClass, stateId), out var actual) ? actual : stateId;

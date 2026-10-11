@@ -42,6 +42,7 @@ public sealed class AuxViewModelTests
             OwnerCompanionPassThrough = false,
             OtherCompanionPassThrough = true,
             RangeSkillDamageExtension = true,
+            ElfBuffCoexistenceEnabled = true,
             PacketSpyStartupEnabled = false,
             InternalBotEnabled = true,
             MultiInstance = true,
@@ -77,6 +78,7 @@ public sealed class AuxViewModelTests
         back.OwnerCompanionPassThrough.ShouldBeFalse();
         back.OtherCompanionPassThrough.ShouldBeTrue();
         back.RangeSkillDamageExtension.ShouldBeTrue();
+        back.ElfBuffCoexistenceEnabled.ShouldBeTrue();
         back.PacketSpyStartupEnabled.ShouldBeFalse();
         back.InternalBotEnabled.ShouldBeTrue();
         back.MultiInstance.ShouldBeTrue();

@@ -209,6 +209,7 @@ public static class LauncherServices
         services.AddSingleton<IGamePatch, LoginHookPatch>();
         services.AddSingleton<IGamePatch, PacketSpyStartupPatch>();
         services.AddSingleton<IGamePatch, RangeSkillDamageProtocolPatch>();
+        services.AddSingleton<IGamePatch, ElfBuffCoexistencePatch>();
         services.AddSingleton<IGamePatch, AntiCheatBypassPatch>();
         services.AddSingleton<IGamePatch, CrtWatsonPatch>();
         services.AddSingleton<IGamePatch, ChatWidthPatch>();

@@ -1,3 +1,4 @@
+using Login38.Aux.Game;
 using Login38.Interop;
 using Login38.Patching.Diagnostics;
 using Microsoft.Extensions.Logging;
@@ -23,9 +24,14 @@ public sealed class ReceivePacketSpyTask : IAuxTask, IAuxTaskShutdown
 
     private RemoteProcess? _game;
     private uint _read;
+    private uint _buffApplyRead;
     private bool _enabled;
     private bool _reportedUnavailable;
     private bool _analysisDumped;
+    private bool _buffApplyInstalled;
+    private bool _buffApplyEnabled;
+    private bool _buffApplyInstallFailed;
+    private readonly HashSet<uint> _buffApplyCallSitesDumped = [];
 
     public ReceivePacketSpyTask(ILogger<ReceivePacketSpyTask> logger) => _logger = logger;
 
@@ -37,7 +43,9 @@ public sealed class ReceivePacketSpyTask : IAuxTask, IAuxTaskShutdown
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        var requested = context.Settings.Misc.LogReceivedPackets;
+        var logAllPackets = context.Settings.Misc.LogReceivedPackets;
+        var elfBuffDiagnostics = context.Settings.Misc.ElfBuffStateDiagnostics;
+        var requested = logAllPackets || elfBuffDiagnostics;
         _game = context.Process;
 
         if (!requested)
@@ -65,16 +73,34 @@ public sealed class ReceivePacketSpyTask : IAuxTask, IAuxTaskShutdown
             {
                 _enabled = true;
                 _reportedUnavailable = false;
-                _logger.LogInformation("{Task}: recording what the server sends", Name);
+                _logger.LogInformation(
+                    "{Task}: receive diagnostics enabled (allPackets={AllPackets}, elfBuffStates={ElfBuffStates})",
+                    Name,
+                    logAllPackets,
+                    elfBuffDiagnostics);
             }
 
-            if (!_analysisDumped)
+            if (elfBuffDiagnostics)
+            {
+                EnableBuffApplyProbe(context.Process);
+            }
+            else
+            {
+                DisableBuffApplyProbe(context.Process);
+            }
+
+            if (logAllPackets && !_analysisDumped)
             {
                 DumpAnalysisAnchors(context.Process);
                 _analysisDumped = true;
             }
 
-            Drain(context.Process);
+            Drain(context.Process, logAllPackets, elfBuffDiagnostics);
+
+            if (elfBuffDiagnostics && _buffApplyEnabled)
+            {
+                DrainBuffApply(context.Process);
+            }
         }
         catch (GameProcessException e)
         {
@@ -101,6 +127,8 @@ public sealed class ReceivePacketSpyTask : IAuxTask, IAuxTaskShutdown
 
     private void Disable(RemoteProcess process)
     {
+        DisableBuffApplyProbe(process);
+
         if (!_enabled)
         {
             return;
@@ -116,7 +144,69 @@ public sealed class ReceivePacketSpyTask : IAuxTask, IAuxTaskShutdown
         _analysisDumped = false;
     }
 
-    private void Drain(RemoteProcess process)
+    private void EnableBuffApplyProbe(RemoteProcess process)
+    {
+        if (_buffApplyInstallFailed)
+        {
+            return;
+        }
+
+        if (!_buffApplyInstalled)
+        {
+            if (!BuffApplyProbe.TryInstall(process, out var info, out var error))
+            {
+                _buffApplyInstallFailed = true;
+                _logger.LogWarning(
+                    "[ELF_BUFF_DIAG2] apply_buff probe unavailable: {Reason}",
+                    error ?? "unknown structural mismatch");
+                return;
+            }
+
+            _buffApplyInstalled = true;
+            _logger.LogInformation(
+                "[ELF_BUFF_DIAG2] apply_buff probe installed target={Target} cave={Cave} directCallSites={CallSites}",
+                info.ApplyBuff,
+                info.Cave,
+                info.PatchedCallSites);
+        }
+
+        if (_buffApplyEnabled)
+        {
+            return;
+        }
+
+        if (BuffApplyProbe.TryReadWriteIndex(process, out var written))
+        {
+            _buffApplyRead = written;
+        }
+
+        if (BuffApplyProbe.TrySetEnabled(process, true))
+        {
+            _buffApplyEnabled = true;
+            _logger.LogInformation(
+                "[ELF_BUFF_DIAG2] apply_buff tracing enabled for states 6,7,8,18..23");
+        }
+    }
+
+    private void DisableBuffApplyProbe(RemoteProcess process)
+    {
+        if (!_buffApplyEnabled)
+        {
+            return;
+        }
+
+        BuffApplyProbe.TrySetEnabled(process, false);
+        _buffApplyEnabled = false;
+
+        if (BuffApplyProbe.TryReadWriteIndex(process, out var written))
+        {
+            _buffApplyRead = written;
+        }
+
+        _logger.LogInformation("[ELF_BUFF_DIAG2] apply_buff tracing disabled");
+    }
+
+    private void Drain(RemoteProcess process, bool logAllPackets, bool elfBuffDiagnostics)
     {
         if (!ReceivePacketProbe.TryReadWriteIndex(process, out var written) || written == _read)
         {
@@ -143,9 +233,134 @@ public sealed class ReceivePacketSpyTask : IAuxTask, IAuxTaskShutdown
                 break;
             }
 
-            _logger.LogInformation("{Task}: {Packet}", Name, packet);
+            if (logAllPackets)
+            {
+                _logger.LogInformation("{Task}: {Packet}", Name, packet);
+            }
+
+            if (elfBuffDiagnostics && ElfBuffDiagnostic.TryParse(packet.Bytes.Span, out var iconPacket))
+            {
+                LogElfBuffState(process, packet, iconPacket, written - (_read + 1));
+            }
+
             _read++;
         }
+    }
+
+    private void DrainBuffApply(RemoteProcess process)
+    {
+        if (!BuffApplyProbe.TryReadWriteIndex(process, out var written) || written == _buffApplyRead)
+        {
+            return;
+        }
+
+        var pending = written - _buffApplyRead;
+        if (pending > BuffApplyProbe.RingLength)
+        {
+            _logger.LogWarning(
+                "[ELF_BUFF_DIAG2] {Count} apply_buff trace events were overwritten before they could be read",
+                pending - BuffApplyProbe.RingLength);
+            _buffApplyRead = written - BuffApplyProbe.RingLength;
+        }
+
+        while (_buffApplyRead != written)
+        {
+            if (!BuffApplyProbe.TryRead(process, _buffApplyRead, out var record))
+            {
+                break;
+            }
+
+            var receiveSequence = record.ReceiveWriteIndex == 0
+                ? "n/a"
+                : (record.ReceiveWriteIndex - 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            _logger.LogInformation(
+                "[ELF_BUFF_CALL] seq={Sequence} recvSeq={ReceiveSequence} phase={Phase} " +
+                "caller={Caller} callSite={CallSite} state={State} skill={Skill} value={Value} " +
+                "class={Class} raw={Primary:X2}/{Secondary:X2}",
+                record.Sequence,
+                receiveSequence,
+                record.PhaseName,
+                record.Caller,
+                record.CallSite,
+                record.StateId,
+                ElfBuffDiagnostic.StateName(record.StateId),
+                record.Value,
+                record.CharacterClass,
+                record.Primary,
+                record.Secondary);
+
+            if (_buffApplyCallSitesDumped.Add(record.CallSite.Value))
+            {
+                DumpBuffCallSite(process, record);
+            }
+
+            _buffApplyRead++;
+        }
+    }
+
+
+    private void DumpBuffCallSite(RemoteProcess process, BuffApplyRecord record)
+    {
+        const int before = 24;
+        const int length = 56;
+
+        var start = record.CallSite - before;
+        var bytes = new byte[length];
+        if (!process.TryReadBytes(start, bytes))
+        {
+            _logger.LogWarning(
+                "[ELF_BUFF_CALL_CODE] could not read callSite={CallSite} state={State}",
+                record.CallSite,
+                record.StateId);
+            return;
+        }
+
+        _logger.LogInformation(
+            "[ELF_BUFF_CALL_CODE] callSite={CallSite} state={State} skill={Skill} start={Start} bytes={Bytes}",
+            record.CallSite,
+            record.StateId,
+            ElfBuffDiagnostic.StateName(record.StateId),
+            start,
+            BytePattern.Format(bytes));
+    }
+
+    private void LogElfBuffState(
+        RemoteProcess process,
+        ReceivePacketRecord packet,
+        ElfBuffIconPacket iconPacket,
+        uint queuedAfter)
+    {
+        var state = BuffState.Read(process);
+        if (state is null)
+        {
+            _logger.LogWarning(
+                "[ELF_BUFF_DIAG] seq={Sequence} caller={Caller} kind={Kind} wireId={WireId} skill={Skill} " +
+                "duration={Duration} targetState={TargetState} queuedAfter={QueuedAfter} states=unavailable",
+                packet.Sequence,
+                packet.DispatcherCaller,
+                iconPacket.Icon.Kind,
+                iconPacket.Icon.WireId,
+                iconPacket.Icon.Name,
+                iconPacket.Duration,
+                iconPacket.Icon.StateId,
+                queuedAfter);
+            return;
+        }
+
+        _logger.LogInformation(
+            "[ELF_BUFF_DIAG] seq={Sequence} caller={Caller} kind={Kind} wireId={WireId} skill={Skill} " +
+            "duration={Duration} targetState={TargetState} class={Class} queuedAfter={QueuedAfter} states={States}",
+            packet.Sequence,
+            packet.DispatcherCaller,
+            iconPacket.Icon.Kind,
+            iconPacket.Icon.WireId,
+            iconPacket.Icon.Name,
+            iconPacket.Duration,
+            iconPacket.Icon.StateId,
+            state.Class,
+            queuedAfter,
+            ElfBuffDiagnostic.FormatStates(state));
     }
 
     /// <summary>

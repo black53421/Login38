@@ -105,6 +105,9 @@ public sealed class AuxConfig
     /// <summary>Use the Login38 per-target range-skill damage protocol extension.</summary>
     public bool RangeSkillDamageExtension { get; set; }
 
+    /// <summary>Allow the tested elf fire and earth buff states to coexist in the client.</summary>
+    public bool ElfBuffCoexistenceEnabled { get; set; }
+
     /// <summary>Record client send calls from startup, before a character enters the world.</summary>
     public bool PacketSpyStartupEnabled { get; set; }
 

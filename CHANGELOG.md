@@ -1,3 +1,36 @@
+# 2026-10-06 — elf buff coexist probe 1
+
+## 2026-10-06 - Elf Buff coexistence option moved to Encoder
+
+- Move the tested fire/earth Buff coexistence switch from the per-character HOME helper to Encoder `客戶端 > 妖精技能相容`.
+- Persist it as `[aux] elf_buff_coexistence_enabled` in `config.ini`.
+- Apply the peer-clear filter as a startup `IGamePatch`; players can no longer toggle this operator-controlled compatibility option at runtime.
+- Existing helper profile JSON containing the old `elf_buff_coexistence` field remains readable because unknown fields are ignored.
+
+- Add an experimental client-side coexistence toggle for the live-verified elf fire states 18/19/20 and earth states 6/7/8.
+- Filter only the peer-clear call at `0x004EE48C`; normal `apply_buff`, expiry and explicit removal paths remain untouched.
+- Reserve `0x004EE48C` from the diagnostic xref tracer so diagnostics and coexistence can be enabled together without competing for the same instruction.
+- Persist the switch as `misc.elf_buff_coexistence` and expose it in the helper UI.
+
+# 2026-10-06 - elf buff native clear-site diagnostics (diag2)
+
+- Fix `elfbuff_diag2` runtime xref guard: the live 3.81C image exposes 135 direct `E8 rel32` calls to `apply_buff`, not the broader 522-caller count from older static-analysis notes.
+- Keep the known `0x005A5B4A -> 0x004EE2D0` anchor check and validate every discovered direct call site before any rewrite is committed.
+
+- Extend elf buff packet diagnostics to `S_OPCODE_SKILLICONSHIELD (0xD8)` types `6/7/10` for `EARTH_SKIN / EARTH_BLESS / IRON_SKIN`, mapped to client states `6/7/8`.
+- Add a diagnostic-only pass-through tracer around direct calls to the client `apply_buff` routine at `0x004EE2D0`.
+- Record `caller`, `callSite`, `state`, `value`, before/after raw bytes, character class, and the correlated receive-ring sequence for states `6/7/8` and `18..23`.
+- Dump a 56-byte code window the first time each traced `callSite` appears so the clearing branch can be reverse engineered from the user log.
+- Validate the known `0x005A5B4A -> 0x004EE2D0` call anchor and the expected direct-call population before rewriting any call site.
+- Do not modify buff state values, packet payloads, helper decisions, or server behavior; when tracing is disabled the wrapper tail-jumps directly to the original function.
+
+# 2026-10-06 - elf buff state diagnostics
+
+- Add a diagnostic-only switch for the six elf aura packets (`147/148/154/155/162/165`).
+- Log client effect states `18..23`, including both raw effect-table halves, after the receive probe observes a matching packet.
+- Keep the existing packet dispatcher and receive ring unchanged; the diagnostic does not alter packet handling, buff states, or helper decisions.
+- Include `queuedAfter` in each diagnostic line so batched receive records can be distinguished from an isolated packet observation.
+
 # 2026-10-05 - optional low-latency F1-F4 worker
 
 - Add Encoder switch `function_key_high_speed_enabled` for a dedicated F1-F4 worker.

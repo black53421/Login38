@@ -95,6 +95,7 @@ public sealed class ListFileCodecTests
                 OwnerCompanionPassThrough = false,
                 OtherCompanionPassThrough = true,
                 RangeSkillDamageExtension = true,
+                ElfBuffCoexistenceEnabled = true,
                 PacketSpyStartupEnabled = false,
                 InventoryLimitValue = 500,
                 ImgLimitValue = 123_456,

@@ -159,6 +159,9 @@ public sealed partial class AuxViewModel : ObservableObject
     private bool _rangeSkillDamageExtension;
 
     [ObservableProperty]
+    private bool _elfBuffCoexistence;
+
+    [ObservableProperty]
     private bool _packetSpyStartup;
 
     [ObservableProperty]
@@ -221,6 +224,7 @@ public sealed partial class AuxViewModel : ObservableObject
         OwnerCompanionPassThrough = aux.OwnerCompanionPassThrough;
         OtherCompanionPassThrough = aux.OtherCompanionPassThrough;
         RangeSkillDamageExtension = aux.RangeSkillDamageExtension;
+        ElfBuffCoexistence = aux.ElfBuffCoexistenceEnabled;
         PacketSpyStartup = aux.PacketSpyStartupEnabled;
         InternalBot = aux.InternalBotEnabled;
         MultipleCopies = aux.MultiInstance;
@@ -259,6 +263,7 @@ public sealed partial class AuxViewModel : ObservableObject
         OwnerCompanionPassThrough = OwnerCompanionPassThrough,
         OtherCompanionPassThrough = OtherCompanionPassThrough,
         RangeSkillDamageExtension = RangeSkillDamageExtension,
+        ElfBuffCoexistenceEnabled = ElfBuffCoexistence,
         PacketSpyStartupEnabled = PacketSpyStartup,
         InternalBotEnabled = InternalBot,
         MultiInstance = MultipleCopies,

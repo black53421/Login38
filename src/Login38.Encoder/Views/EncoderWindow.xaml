@@ -355,6 +355,17 @@
 
                             <Separator Margin="0,10" />
 
+                            <TextBlock Text="妖精技能相容" Style="{StaticResource SectionHead}" />
+                            <CheckBox Content="允許火系 / 土系 Buff 圖示共存（實驗）"
+                                      Margin="{StaticResource RowSpacing}"
+                                      IsChecked="{Binding ElfBuffCoexistence, Mode=TwoWay}" />
+                            <TextBlock Style="{StaticResource Text.Caption}"
+                                       Text="解除已實測的火系與土系 Client Buff state 互斥；Server 仍負責實際技能效果與持續時間。"
+                                       TextWrapping="Wrap"
+                                       Margin="24,0,0,8" />
+
+                            <Separator Margin="0,10" />
+
                             <TextBlock Text="寵物／召喚獸碰撞" Style="{StaticResource SectionHead}" />
                             <CheckBox Content="可穿越自己的寵物／召喚獸"
                                       Margin="{StaticResource RowSpacing}"
